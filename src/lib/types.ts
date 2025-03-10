@@ -75,3 +75,45 @@ export interface QueueStatus {
   waitingCount: number;
   lastCalledTicket?: Ticket;
 }
+
+export interface Service {
+  id: string;
+  code: string;
+  name: string;
+  description?: string;
+  isActive: boolean;
+  createdAt: Date;
+}
+
+export interface Room {
+  id: string;
+  number: string;
+  name: string;
+  serviceId: string;
+  service?: Service;
+  isActive: boolean;
+  createdAt: Date;
+}
+
+export interface CompanySettings {
+  id: string;
+  name: string;
+  address: string;
+  phone: string;
+  email: string;
+  logo?: string;
+  ticketFooter?: string;
+  displayMessage?: string;
+}
+
+export interface User {
+  id: string;
+  username: string;
+  name: string;
+  email: string;
+  role: 'admin' | 'operator' | 'viewer';
+  isActive: boolean;
+  serviceIds: string[];
+  services?: Service[];
+  createdAt: Date;
+}

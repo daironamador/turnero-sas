@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { CalendarDays, Users, Ticket, Home } from 'lucide-react';
+import { CalendarDays, Ticket, Home, Settings, Phone } from 'lucide-react';
 import OcularLogo from '@/components/ui-components/OcularLogo';
 import { cn } from '@/lib/utils';
 
@@ -50,6 +50,19 @@ const Header: React.FC = () => {
           </Link>
           
           <Link
+            to="/llamada"
+            className={cn(
+              "flex items-center text-sm font-medium transition-colors hover:text-ocular-600",
+              isActive('/llamada') 
+                ? "text-ocular-700 border-b-2 border-ocular-600" 
+                : "text-muted-foreground"
+            )}
+          >
+            <Phone className="w-4 h-4 mr-2" />
+            <span>Llamada</span>
+          </Link>
+          
+          <Link
             to="/appointments"
             className={cn(
               "flex items-center text-sm font-medium transition-colors hover:text-ocular-600",
@@ -63,16 +76,16 @@ const Header: React.FC = () => {
           </Link>
           
           <Link
-            to="/patients"
+            to="/config"
             className={cn(
               "flex items-center text-sm font-medium transition-colors hover:text-ocular-600",
-              isActive('/patients') 
+              isActive('/config') 
                 ? "text-ocular-700 border-b-2 border-ocular-600" 
                 : "text-muted-foreground"
             )}
           >
-            <Users className="w-4 h-4 mr-2" />
-            <span>Pacientes</span>
+            <Settings className="w-4 h-4 mr-2" />
+            <span>Configuración</span>
           </Link>
 
           <Link

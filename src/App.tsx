@@ -9,6 +9,12 @@ import Appointments from "./pages/Appointments";
 import Tickets from "./pages/Tickets";
 import Display from "./pages/Display";
 import NotFound from "./pages/NotFound";
+import Llamada from "./pages/Llamada";
+import Config from "./pages/Config";
+import ConfigServices from "./pages/config/Services";
+import ConfigRooms from "./pages/config/Rooms";
+import ConfigSettings from "./pages/config/Settings";
+import ConfigUsers from "./pages/config/Users";
 
 const queryClient = new QueryClient();
 
@@ -23,8 +29,13 @@ const App = () => (
           <Route path="/appointments" element={<Appointments />} />
           <Route path="/appointments/:action" element={<Appointments />} />
           <Route path="/tickets" element={<Tickets />} />
-          <Route path="/tickets/:action" element={<Tickets />} />
+          <Route path="/llamada" element={<Llamada />} />
           <Route path="/display" element={<Display />} />
+          <Route path="/config" element={<Config />} />
+          <Route path="/config/services" element={<ConfigServices />} />
+          <Route path="/config/rooms" element={<ConfigRooms />} />
+          <Route path="/config/settings" element={<ConfigSettings />} />
+          <Route path="/config/users" element={<ConfigUsers />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
