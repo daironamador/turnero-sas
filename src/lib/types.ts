@@ -42,3 +42,32 @@ export interface DashboardStats {
   cancelledToday: number;
   newPatientsToday: number;
 }
+
+export type ServiceType = 'CG' | 'RX' | 'RR' | 'EX' | 'OT';
+
+export const ServiceTypeLabels: Record<ServiceType, string> = {
+  CG: 'Consulta General',
+  RX: 'Rayos X',
+  RR: 'Recoger Resultados',
+  EX: 'Exámenes',
+  OT: 'Otros Servicios'
+};
+
+export interface Ticket {
+  id: string;
+  ticketNumber: string;
+  serviceType: ServiceType;
+  status: 'waiting' | 'serving' | 'completed' | 'cancelled';
+  createdAt: Date;
+  calledAt?: Date;
+  completedAt?: Date;
+  counterNumber?: number;
+  patientName?: string;
+}
+
+export interface QueueStatus {
+  serviceType: ServiceType;
+  currentTicket?: Ticket;
+  waitingCount: number;
+  lastCalledTicket?: Ticket;
+}

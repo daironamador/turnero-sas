@@ -1,44 +1,93 @@
 
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Calendar, Home, Users } from 'lucide-react';
-import OcularLogo from '../ui-components/OcularLogo';
+import { CalendarDays, Users, Ticket, Home } from 'lucide-react';
+import OcularLogo from '@/components/ui-components/OcularLogo';
 import { cn } from '@/lib/utils';
 
 const Header: React.FC = () => {
   const location = useLocation();
+  const pathname = location.pathname;
   
-  const navigation = [
-    { name: 'Dashboard', href: '/', icon: Home },
-    { name: 'Appointments', href: '/appointments', icon: Calendar },
-    { name: 'Patients', href: '/patients', icon: Users },
-  ];
-
+  const isActive = (path: string) => {
+    return pathname === path || pathname.startsWith(`${path}/`);
+  };
+  
   return (
-    <header className="glass sticky top-0 z-50 w-full px-6 py-3 flex justify-between items-center">
-      <OcularLogo />
-      
-      <nav className="flex items-center space-x-1">
-        {navigation.map((item) => {
-          const isActive = location.pathname === item.href;
+    <header className="border-b border-border bg-background">
+      <div className="container flex h-14 items-center">
+        <div className="mr-4 flex">
+          <Link to="/" className="flex items-center space-x-2">
+            <OcularLogo />
+            <span className="font-semibold">OcularClinic</span>
+          </Link>
+        </div>
+        <nav className="flex items-center space-x-4 lg:space-x-6">
+          <Link
+            to="/"
+            className={cn(
+              "flex items-center text-sm font-medium transition-colors hover:text-ocular-600",
+              isActive('/') 
+                ? "text-ocular-700 border-b-2 border-ocular-600" 
+                : "text-muted-foreground"
+            )}
+          >
+            <Home className="w-4 h-4 mr-2" />
+            <span>Inicio</span>
+          </Link>
           
-          return (
-            <Link
-              key={item.name}
-              to={item.href}
-              className={cn(
-                'flex items-center px-4 py-2 rounded-full text-sm font-medium transition-all duration-200',
-                isActive
-                  ? 'bg-primary text-primary-foreground shadow-md'
-                  : 'hover:bg-muted'
-              )}
-            >
-              <item.icon className={cn('h-4 w-4 mr-2')} />
-              {item.name}
-            </Link>
-          );
-        })}
-      </nav>
+          <Link
+            to="/tickets"
+            className={cn(
+              "flex items-center text-sm font-medium transition-colors hover:text-ocular-600",
+              isActive('/tickets') 
+                ? "text-ocular-700 border-b-2 border-ocular-600" 
+                : "text-muted-foreground"
+            )}
+          >
+            <Ticket className="w-4 h-4 mr-2" />
+            <span>Tickets</span>
+          </Link>
+          
+          <Link
+            to="/appointments"
+            className={cn(
+              "flex items-center text-sm font-medium transition-colors hover:text-ocular-600",
+              isActive('/appointments') 
+                ? "text-ocular-700 border-b-2 border-ocular-600" 
+                : "text-muted-foreground"
+            )}
+          >
+            <CalendarDays className="w-4 h-4 mr-2" />
+            <span>Turnos</span>
+          </Link>
+          
+          <Link
+            to="/patients"
+            className={cn(
+              "flex items-center text-sm font-medium transition-colors hover:text-ocular-600",
+              isActive('/patients') 
+                ? "text-ocular-700 border-b-2 border-ocular-600" 
+                : "text-muted-foreground"
+            )}
+          >
+            <Users className="w-4 h-4 mr-2" />
+            <span>Pacientes</span>
+          </Link>
+
+          <Link
+            to="/display"
+            className={cn(
+              "flex items-center text-sm font-medium transition-colors hover:text-ocular-600 ml-4 text-ocular-600",
+              isActive('/display') 
+                ? "text-ocular-700 border-b-2 border-ocular-600" 
+                : ""
+            )}
+          >
+            <span>Ver Pantalla</span>
+          </Link>
+        </nav>
+      </div>
     </header>
   );
 };
