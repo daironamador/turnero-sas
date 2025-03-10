@@ -57,12 +57,16 @@ export interface Ticket {
   id: string;
   ticketNumber: string;
   serviceType: ServiceType;
-  status: 'waiting' | 'serving' | 'completed' | 'cancelled';
+  status: 'waiting' | 'serving' | 'completed' | 'cancelled' | 'redirected';
+  isVip?: boolean;
   createdAt: Date;
   calledAt?: Date;
   completedAt?: Date;
   counterNumber?: number;
   patientName?: string;
+  redirectedTo?: ServiceType;
+  redirectedFrom?: ServiceType;
+  previousTicketNumber?: string;
 }
 
 export interface QueueStatus {
