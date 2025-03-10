@@ -15,8 +15,8 @@ const Header: React.FC = () => {
   
   return (
     <header className="border-b border-border bg-background">
-      <div className="container flex h-14 items-center">
-        <div className="mr-4 flex">
+      <div className="container flex h-14 items-center justify-between">
+        <div className="flex">
           <Link to="/" className="flex items-center space-x-2">
             <OcularLogo />
             <span className="font-semibold">OcularClinic</span>
@@ -60,19 +60,6 @@ const Header: React.FC = () => {
           >
             <Phone className="w-4 h-4 mr-2" />
             <span>Llamada</span>
-          </Link>
-          
-          <Link
-            to="/appointments"
-            className={cn(
-              "flex items-center text-sm font-medium transition-colors hover:text-ocular-600",
-              isActive('/appointments') 
-                ? "text-ocular-700 border-b-2 border-ocular-600" 
-                : "text-muted-foreground"
-            )}
-          >
-            <CalendarDays className="w-4 h-4 mr-2" />
-            <span>Turnos</span>
           </Link>
           
           <Link

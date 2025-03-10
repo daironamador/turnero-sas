@@ -135,11 +135,11 @@ const DisplayScreen: React.FC<DisplayScreenProps> = ({ refreshInterval = 5000 })
           <div className="container mx-auto flex items-center">
             <Bell className="w-6 h-6 mr-3 animate-bounce" />
             <span className="text-xl font-bold mr-2 flex items-center">
-              Ticket #{newlyCalledTicket.ticketNumber}
+              Turno #{newlyCalledTicket.ticketNumber}
               {newlyCalledTicket.isVip && <Star className="ml-2 h-5 w-5" />}
             </span>
             <span className="text-xl">
-              por favor pasar a ventanilla {newlyCalledTicket.counterNumber}
+              por favor dirigirse a sala {newlyCalledTicket.counterNumber}
             </span>
             <Volume2 className="w-6 h-6 ml-auto" />
           </div>
@@ -171,7 +171,7 @@ const DisplayScreen: React.FC<DisplayScreenProps> = ({ refreshInterval = 5000 })
                   <CardHeader className="pb-3">
                     <CardTitle className="flex justify-between">
                       <div className="flex items-center">
-                        <span className="text-xl">Ventanilla {ticket.counterNumber}</span>
+                        <span className="text-xl">Sala {ticket.counterNumber}</span>
                         {ticket.isVip && <Star className="ml-2 h-5 w-5 text-yellow-500" />}
                       </div>
                       <span className={ticket.isVip ? 'text-yellow-700' : 'text-ocular-700'}>
@@ -238,7 +238,7 @@ const DisplayScreen: React.FC<DisplayScreenProps> = ({ refreshInterval = 5000 })
                         <p className={`text-xl font-semibold ${ticket.isVip ? 'text-yellow-700' : 'text-ocular-700'}`}>
                           {ticket.counterNumber}
                         </p>
-                        <p className="text-xs text-gray-500">Ventanilla</p>
+                        <p className="text-xs text-gray-500">Sala</p>
                       </div>
                     </div>
                   </CardContent>
