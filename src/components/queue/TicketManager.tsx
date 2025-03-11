@@ -65,14 +65,12 @@ const TicketManager: React.FC<TicketManagerProps> = ({
       callTicket(ticketId, counterNumber),
     onSuccess: () => {
       toast({
-        title: "Ticket llamado",
         description: `Se ha llamado al ticket ${currentTicket?.ticketNumber} en el counter ${counterNumber}`,
       });
       onTicketChange();
     },
     onError: (error: any) => {
       toast({
-        title: "Error al llamar ticket",
         description: error.message || "No se pudo llamar al ticket",
         variant: "destructive",
       });
@@ -83,14 +81,12 @@ const TicketManager: React.FC<TicketManagerProps> = ({
     mutationFn: ({ ticketId }: CompleteTicketParams) => completeTicket(ticketId),
     onSuccess: () => {
       toast({
-        title: "Ticket completado",
         description: `Se ha completado el ticket ${currentTicket?.ticketNumber}`,
       });
       onTicketChange();
     },
     onError: (error: any) => {
       toast({
-        title: "Error al completar ticket",
         description: error.message || "No se pudo completar el ticket",
         variant: "destructive",
       });
@@ -101,14 +97,12 @@ const TicketManager: React.FC<TicketManagerProps> = ({
     mutationFn: ({ ticketId }: CancelTicketParams) => cancelTicket(ticketId),
     onSuccess: () => {
       toast({
-        title: "Ticket cancelado",
         description: `Se ha cancelado el ticket ${currentTicket?.ticketNumber}`,
       });
       onTicketChange();
     },
     onError: (error: any) => {
       toast({
-        title: "Error al cancelar ticket",
         description: error.message || "No se pudo cancelar el ticket",
         variant: "destructive",
       });
@@ -120,14 +114,12 @@ const TicketManager: React.FC<TicketManagerProps> = ({
       redirectTicket(ticketId, serviceType as ServiceType),
     onSuccess: () => {
       toast({
-        title: "Ticket redirigido",
         description: `Se ha redirigido el ticket ${currentTicket?.ticketNumber} al servicio ${selectedService}`,
       });
       onTicketChange();
     },
     onError: (error: any) => {
       toast({
-        title: "Error al redirigir ticket",
         description: error.message || "No se pudo redirigir el ticket",
         variant: "destructive",
       });
