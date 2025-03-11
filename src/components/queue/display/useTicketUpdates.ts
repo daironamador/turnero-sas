@@ -111,9 +111,10 @@ export function useTicketUpdates({
     channel.subscribe();
     
     // Handler for the custom recall event from the Llamada page
-    const handleTicketRecalled = (event: CustomEvent) => {
-      const { ticketNumber, counterName, redirectedFrom, originalRoomName } = event.detail;
-      console.info('Ticket recalled event received in Display:', event.detail);
+    const handleTicketRecalled = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { ticketNumber, counterName, redirectedFrom, originalRoomName } = customEvent.detail;
+      console.info('Ticket recalled event received in Display:', customEvent.detail);
       
       // Show notification
       if (roomsQuery.data) {
@@ -142,12 +143,12 @@ export function useTicketUpdates({
       );
     };
     
-    // Add event listener for the custom event with proper type casting for CustomEvent
-    window.addEventListener('ticket-recalled', handleTicketRecalled as EventListener);
+    // Add event listener for the custom event - using a regular EventListener cast
+    window.addEventListener('ticket-recalled', handleTicketRecalled);
     
     return () => {
       supabase.removeChannel(channel);
-      window.removeEventListener('ticket-recalled', handleTicketRecalled as EventListener);
+      window.removeEventListener('ticket-recalled', handleTicketRecalled);
     };
   }, [
     queryClient, 
