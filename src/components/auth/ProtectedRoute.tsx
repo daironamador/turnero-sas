@@ -1,7 +1,9 @@
 
+import React, { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { supabase } from '@/lib/supabase';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -12,8 +14,29 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
   allowedRoles = []
 }) => {
-  const { user, loading } = useAuth();
+  const { user, loading, refreshUser } = useAuth();
   const location = useLocation();
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
+
+  // On component mount, try to refresh the user session
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        // First check if there's a valid session
+        const { data } = await supabase.auth.getSession();
+        if (!data.session && localStorage.getItem('supabase-auth-session')) {
+          // If we have a stored session but no active session, try to refresh
+          await refreshUser();
+        }
+      } catch (error) {
+        console.error('Error checking session:', error);
+      } finally {
+        setIsCheckingSession(false);
+      }
+    };
+
+    checkSession();
+  }, [refreshUser]);
 
   // Allow access to /display without authentication
   if (location.pathname === '/display') {
@@ -21,7 +44,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   // Show loading indicator while checking auth state
-  if (loading) {
+  if (loading || isCheckingSession) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ocular-600"></div>

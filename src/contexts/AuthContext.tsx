@@ -61,26 +61,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const getSession = async () => {
       setLoading(true);
       try {
-        // Try to restore session from localStorage first if available
-        const storedSession = localStorage.getItem('supabase-auth-session');
-        if (storedSession) {
-          const parsedSession = JSON.parse(storedSession);
-          const { data, error } = await supabase.auth.setSession({
-            access_token: parsedSession.access_token,
-            refresh_token: parsedSession.refresh_token,
-          });
-          
-          if (error) {
-            console.error('Error restoring session:', error);
-            localStorage.removeItem('supabase-auth-session');
-          } else if (data && data.session) {
-            setSession(data.session);
-            setUser(data.session.user);
-            setUserRole(data.session.user.user_metadata?.role || 'viewer');
-          }
+        // First try to get the session from Supabase (most reliable method)
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        
+        if (currentSession) {
+          // If we have a current valid session, use it
+          setSession(currentSession);
+          setUser(currentSession.user);
+          setUserRole(currentSession.user.user_metadata?.role || 'viewer');
         } else {
-          // If no stored session, get the current session
-          await refreshUser();
+          // If no current session, try to restore from localStorage
+          const storedSession = localStorage.getItem('supabase-auth-session');
+          if (storedSession) {
+            const parsedSession = JSON.parse(storedSession);
+            const { data, error } = await supabase.auth.setSession({
+              access_token: parsedSession.access_token,
+              refresh_token: parsedSession.refresh_token,
+            });
+            
+            if (error) {
+              console.error('Error restoring session:', error);
+              localStorage.removeItem('supabase-auth-session');
+            } else if (data && data.session) {
+              setSession(data.session);
+              setUser(data.session.user);
+              setUserRole(data.session.user.user_metadata?.role || 'viewer');
+            }
+          }
         }
       } catch (error) {
         console.error('Error getting session:', error);
@@ -93,15 +100,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Set up auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('Auth state changed:', event);
+      console.log('Auth state changed:', event, session?.user?.email);
       
-      // Store session in localStorage when user logs in
-      if (session && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
-        localStorage.setItem('supabase-auth-session', JSON.stringify(session));
+      // Store session in localStorage for all events that have a valid session
+      if (session) {
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+          console.log('Storing session in localStorage');
+          localStorage.setItem('supabase-auth-session', JSON.stringify(session));
+        }
       }
       
       // Remove session from localStorage when user logs out
       if (event === 'SIGNED_OUT') {
+        console.log('Removing session from localStorage');
         localStorage.removeItem('supabase-auth-session');
       }
       
