@@ -36,20 +36,30 @@ export const useUserManagement = () => {
           throw usersError;
         }
         
+        // Transform services data to match our Service type
+        const transformedServices: Service[] = servicesData.map(service => ({
+          id: service.id,
+          code: service.code,
+          name: service.name,
+          description: service.description || undefined,
+          isActive: service.is_active,
+          createdAt: new Date(service.created_at)
+        }));
+        
         // Transform users data to match our User type
-        const transformedUsers = usersData.map(user => ({
+        const transformedUsers: User[] = usersData.map(user => ({
           id: user.id,
           username: user.username,
           name: user.name,
           email: user.email,
-          role: user.role,
+          role: (user.role as "admin" | "operator" | "viewer"),
           isActive: user.is_active,
           serviceIds: user.service_ids || [],
-          services: servicesData.filter(s => (user.service_ids || []).includes(s.id)),
+          services: transformedServices.filter(s => (user.service_ids || []).includes(s.id)),
           createdAt: new Date(user.created_at)
         }));
         
-        setServices(servicesData);
+        setServices(transformedServices);
         setUsers(transformedUsers);
       } catch (error: any) {
         console.error('Error al cargar datos:', error);

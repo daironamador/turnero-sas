@@ -28,6 +28,7 @@ const Users: React.FC = () => {
     isDialogOpen,
     currentUser,
     setIsDialogOpen,
+    setCurrentUser,
     handleSaveUser,
     toggleUserStatus,
     openEditDialog,

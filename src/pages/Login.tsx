@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -13,8 +13,8 @@ import { CompanySettings } from '@/lib/types';
 
 const Login = () => {
   const [loading, setLoading] = useState(false);
-  const [email, setEmail] = useState('admin1@example.com');
-  const [password, setPassword] = useState('123456');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<CompanySettings | null>(null);
   const navigate = useNavigate();
@@ -68,12 +68,77 @@ const Login = () => {
     
     try {
       setLoading(true);
+      console.log(`Intentando iniciar sesión con: ${email}`);
+      
+      // Primero verificamos si el usuario existe en la tabla 'users'
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', email)
+        .single();
+      
+      if (userError) {
+        console.log('Error al buscar usuario:', userError.message);
+        throw new Error('Usuario no encontrado. Por favor verifique sus credenciales.');
+      }
+      
+      if (!userData || !userData.is_active) {
+        throw new Error('Usuario no encontrado o inactivo. Por favor contacte al administrador.');
+      }
+      
+      // Si el usuario existe, intentamos iniciar sesión
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
       });
       
-      if (error) throw error;
+      if (error) {
+        // Si es un error específico de credenciales inválidas pero el usuario existe en la tabla
+        if (error.message === 'Invalid login credentials') {
+          // Probablemente el usuario fue creado solo en la tabla pero no en auth debido al límite de correos
+          console.log('Error de autenticación pero usuario existente en la tabla');
+          
+          // Intentar crear el usuario en auth (signup) para que pueda iniciar sesión
+          const { error: signUpError } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              data: {
+                name: userData.name,
+                username: userData.username,
+                role: userData.role,
+                service_ids: userData.service_ids || []
+              }
+            }
+          });
+          
+          if (signUpError) {
+            console.error('Error al crear usuario en auth:', signUpError);
+            throw new Error('Error al crear credenciales. Por favor contacte al administrador.');
+          }
+          
+          // Ahora intentamos iniciar sesión nuevamente
+          const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({
+            email,
+            password
+          });
+          
+          if (retryError) {
+            throw retryError;
+          }
+          
+          // Si llegamos aquí, el inicio de sesión fue exitoso
+          toast({
+            title: "Inicio de sesión exitoso",
+            description: "Bienvenido al sistema",
+          });
+          
+          navigate('/');
+          return;
+        }
+        
+        throw error;
+      }
       
       toast({
         title: "Inicio de sesión exitoso",
@@ -140,10 +205,6 @@ const Login = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loading}
               />
-            </div>
-            <div className="text-sm text-muted-foreground">
-              <p>Usuario predeterminado: admin1@example.com</p>
-              <p>Contraseña: 123456</p>
             </div>
           </CardContent>
           <CardFooter>

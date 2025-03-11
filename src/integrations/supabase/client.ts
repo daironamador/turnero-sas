@@ -14,84 +14,87 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
 // Función para crear un nuevo usuario
 export const createUser = async (email: string, password: string, userData: any) => {
   try {
-    // Instead of using signUp, which triggers an email verification, we'll use admin functions 
-    // to create a user directly
-    
-    // First create a user record in the users table
-    const { data: userData_created, error: userError } = await supabase
-      .from('users')
-      .insert([
-        {
-          email: email,
-          username: userData.username,
-          name: userData.name,
-          role: userData.role,
-          service_ids: userData.serviceIds,
-          is_active: true
-        }
-      ])
-      .select();
-
-    if (userError) {
-      console.error('Error al crear registro de usuario:', userError.message);
-      return { user: null, error: userError };
-    }
-
-    // For testing purposes, we'll sign in the user automatically
-    // This simulates a successful signup without email verification
-    const { data, error } = await supabase.auth.signInWithPassword({
+    // First, try to create the auth user directly via signup
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email,
-      password
-    });
-
-    if (error) {
-      // If login fails (e.g., user doesn't exist), create the user with signUp
-      // but handle the potential email rate limit error
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name: userData.name,
-            username: userData.username,
-            role: userData.role,
-            service_ids: userData.serviceIds
-          }
+      password,
+      options: {
+        data: {
+          name: userData.name,
+          username: userData.username,
+          role: userData.role,
+          service_ids: userData.serviceIds
         }
-      });
+      }
+    });
+    
+    // If we hit the email rate limit or other signup error, create a user in the users table directly
+    if (signUpError) {
+      console.log('SignUp error:', signUpError.message);
+      
+      if (signUpError.message.includes('email rate limit')) {
+        // Create a user record in the users table directly
+        const { data: userData_created, error: userError } = await supabase
+          .from('users')
+          .insert([
+            {
+              email: email,
+              username: userData.username,
+              name: userData.name,
+              role: userData.role,
+              service_ids: userData.serviceIds,
+              is_active: true
+            }
+          ])
+          .select();
 
-      if (signUpError) {
-        // If we hit the email rate limit, we'll display a user-friendly message
-        if (signUpError.message.includes('email rate limit')) {
-          return { 
-            user: userData_created ? userData_created[0] : null, 
-            error: {
-              name: 'EmailRateLimit',
-              message: 'Se ha alcanzado el límite de envío de correos. El usuario fue creado correctamente, pero no se pudo enviar el correo de verificación.' 
-            },
-            message: 'Se ha alcanzado el límite de envío de correos. El usuario fue creado correctamente, pero no se pudo enviar el correo de verificación.'
-          };
+        if (userError) {
+          console.error('Error al crear registro de usuario:', userError.message);
+          return { user: null, error: userError, message: userError.message };
         }
         
-        console.error('Error al crear usuario:', signUpError.message);
-        return { user: null, error: signUpError };
+        return { 
+          user: userData_created ? userData_created[0] : null, 
+          error: {
+            name: 'EmailRateLimit',
+            message: 'Se ha alcanzado el límite de envío de correos. El usuario fue creado correctamente, pero no se pudo enviar el correo de verificación.' 
+          },
+          message: 'Se ha alcanzado el límite de envío de correos. El usuario fue creado correctamente, pero no se pudo enviar el correo de verificación.'
+        };
       }
-
-      return { 
-        user: signUpData.user, 
-        error: null,
-        message: 'Usuario creado correctamente. Se ha enviado un correo de verificación.'
-      };
+      
+      return { user: null, error: signUpError, message: signUpError.message };
+    }
+    
+    // If signup successful, also create record in users table to ensure it exists
+    if (signUpData.user) {
+      const { error: userError } = await supabase
+        .from('users')
+        .insert([
+          {
+            id: signUpData.user.id,
+            email: email,
+            username: userData.username,
+            name: userData.name,
+            role: userData.role,
+            service_ids: userData.serviceIds,
+            is_active: true
+          }
+        ]);
+        
+      if (userError) {
+        console.error('Error al crear registro de usuario:', userError.message);
+        // Continue anyway, auth user was created
+      }
     }
 
-    // If login succeeds, the user already exists, return their data
     return { 
-      user: data.user, 
+      user: signUpData.user, 
       error: null,
-      message: 'El usuario ya existe y ha sido autenticado correctamente.'
+      message: 'Usuario creado correctamente. Se ha enviado un correo de verificación.'
     };
   } catch (error: any) {
     console.error('Error inesperado al crear usuario:', error);
-    return { user: null, error };
+    return { user: null, error, message: error.message };
   }
 };
