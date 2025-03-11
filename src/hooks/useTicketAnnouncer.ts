@@ -136,7 +136,9 @@ export function useTicketAnnouncer() {
     }
     
     // Reset retry counter for this ticket
-    resendAttemptsRef.current.set(ticket.id, 0);
+    if (ticket.id) {
+      resendAttemptsRef.current.set(ticket.id, 0);
+    }
     
     try {
       ticketChannel.postMessage(announcement);

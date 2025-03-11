@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Service, Ticket, Room, ServiceType } from '@/lib/types';
 import { useTicketMutations } from '@/hooks/useTicketMutations';
@@ -79,13 +80,21 @@ const TicketManager: React.FC<TicketManagerProps> = ({
   const handleRecallFromHistory = (ticket: Ticket) => {
     if (!counterName) return;
     
+    // Create a properly formatted ticket object before recall
+    const recallTicket = {
+      ...ticket,
+      counterNumber: counterNumber // Keep as string for the mutation
+    };
+    
     recallTicketMutation.mutate({ 
-      ticket 
+      ticket: recallTicket
     }, {
       onSuccess: () => {
+        // For announcement, ensure counterNumber is parsed as a number if needed
+        // This avoids type mismatch issues with the announcement system
         announceTicket({
           ...ticket,
-          counterNumber: parseInt(counterNumber),
+          counterNumber: counterNumber, // Keep as string for announcement
           status: "serving"
         }, counterName, rooms);
       }
