@@ -34,11 +34,11 @@ const ServingTicketsSection: React.FC<ServingTicketsSectionProps> = ({ tickets, 
         ) : (
           tickets?.map((ticket) => {
             // Get room name if available
-            let counterName = `Sala ${ticket.counterNumber}`;
+            let roomName = 'Sala';
             if (rooms && ticket.counterNumber) {
               const room = rooms.find(r => r.id === ticket.counterNumber);
               if (room) {
-                counterName = room.name;
+                roomName = room.name;
               }
             }
             
@@ -50,7 +50,7 @@ const ServingTicketsSection: React.FC<ServingTicketsSectionProps> = ({ tickets, 
                 <CardHeader className="pb-3">
                   <CardTitle className="flex justify-between">
                     <div className="flex items-center">
-                      <span className="text-xl">{counterName}</span>
+                      <span className="text-xl">{roomName}</span>
                       {ticket.isVip && <Star className="ml-2 h-5 w-5 text-yellow-500" />}
                     </div>
                     <span className={ticket.isVip ? 'text-yellow-700' : 'text-ocular-700'}>

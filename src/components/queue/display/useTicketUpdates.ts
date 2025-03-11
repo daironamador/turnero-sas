@@ -48,11 +48,11 @@ export function useTicketUpdates({
             const ticketKey = `${ticketNumber}-${counterNumber}`;
             if (lastAnnounced !== ticketKey) {
               // Get room name if possible
-              let counterLabel = counterNumber ? counterNumber : 'recepción';
+              let roomName = counterNumber ? `sala ${counterNumber}` : 'recepción';
               if (roomsQuery.data && counterNumber) {
                 const room = roomsQuery.data.find((r: any) => r.id === counterNumber);
                 if (room) {
-                  counterLabel = room.name;
+                  roomName = room.name;
                 }
               }
               
@@ -73,7 +73,7 @@ export function useTicketUpdates({
               setLastAnnounced(ticketKey);
               
               // Announce the ticket with voice
-              announceTicket(ticketNumber, counterLabel);
+              announceTicket(ticketNumber, roomName);
               
               // Remove the notification after a few seconds
               setTimeout(() => {

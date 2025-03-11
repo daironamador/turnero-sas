@@ -33,11 +33,11 @@ const LastCalledSection: React.FC<LastCalledSectionProps> = ({ tickets, rooms, i
         ) : (
           tickets?.map((ticket) => {
             // Get room name if available
-            let counterName = `Sala ${ticket.counterNumber}`;
+            let roomName = ticket.counterNumber || '';
             if (rooms && ticket.counterNumber) {
               const room = rooms.find(r => r.id === ticket.counterNumber);
               if (room) {
-                counterName = room.name;
+                roomName = room.name;
               }
             }
             
@@ -84,7 +84,7 @@ const LastCalledSection: React.FC<LastCalledSectionProps> = ({ tickets, rooms, i
                     </div>
                     <div className="bg-gray-100 px-3 py-2 rounded-md text-center">
                       <p className={`text-xl font-semibold ${ticket.isVip ? 'text-yellow-700' : 'text-ocular-700'}`}>
-                        {ticket.counterNumber}
+                        {roomName}
                       </p>
                       <p className="text-xs text-gray-500">Sala</p>
                     </div>
