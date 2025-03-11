@@ -2,7 +2,7 @@
 import React from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { PhoneCall, Clock, User } from 'lucide-react';
+import { PhoneCall, Clock, User, Star } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,12 +19,30 @@ const NextTicket: React.FC<NextTicketProps> = ({
   onCallNext,
   isCallPending
 }) => {
+  const isVip = nextTicket?.isVip;
+  
   return (
-    <Card className={`bg-white border ${nextTicket ? 'border-primary/20' : 'border-muted'}`}>
+    <Card className={`bg-white border ${
+      isVip 
+        ? 'border-yellow-300 bg-yellow-50'
+        : nextTicket 
+          ? 'border-primary/20' 
+          : 'border-muted'
+    }`}>
       <CardHeader className="pb-2">
         <CardTitle className="text-lg flex items-center justify-between">
           Siguiente Ticket
-          {nextTicket && <Badge variant="outline">{nextTicket.ticketNumber}</Badge>}
+          {nextTicket && (
+            <div className="flex items-center">
+              <Badge 
+                variant={isVip ? "default" : "outline"}
+                className={isVip ? "bg-yellow-500 border-yellow-500 text-white" : ""}
+              >
+                {nextTicket.ticketNumber}
+              </Badge>
+              {isVip && <Star className="ml-1 h-4 w-4 text-yellow-500 fill-yellow-500" />}
+            </div>
+          )}
         </CardTitle>
         <CardDescription>
           {nextTicket ? 'Próximo ticket a ser llamado' : 'No hay tickets en espera'}
@@ -54,7 +72,7 @@ const NextTicket: React.FC<NextTicketProps> = ({
           
           <CardFooter className="pt-2">
             <Button 
-              className="w-full"
+              className={`w-full ${isVip ? 'bg-yellow-500 hover:bg-yellow-600' : ''}`}
               onClick={onCallNext} 
               disabled={isCallPending || !nextTicket}
             >

@@ -9,7 +9,7 @@ import { Room, Service, Ticket } from '@/lib/types';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { PhoneCall } from 'lucide-react';
+import { PhoneCall, Star } from 'lucide-react';
 
 const Llamada: React.FC = () => {
   const [selectedRoom, setSelectedRoom] = useState<(Room & { service: Service }) | null>(null);
@@ -18,7 +18,19 @@ const Llamada: React.FC = () => {
   // Fetch waiting tickets
   const waitingTicketsQuery = useQuery({
     queryKey: ['waitingTickets'],
-    queryFn: async () => getTicketsByStatus('waiting'),
+    queryFn: async () => {
+      const tickets = await getTicketsByStatus('waiting');
+      
+      // Sort tickets: VIP tickets first, then regular tickets, both by creation date
+      return tickets.sort((a, b) => {
+        // First sort by VIP status (VIP tickets come first)
+        if (a.isVip && !b.isVip) return -1;
+        if (!a.isVip && b.isVip) return 1;
+        
+        // Then sort by creation date (oldest first)
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      });
+    },
   });
 
   // Fetch rooms with their services
