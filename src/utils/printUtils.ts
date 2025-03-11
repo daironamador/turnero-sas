@@ -320,31 +320,31 @@ export const printReport = async (
       <div class="stats-container">
         <div class="stat-box">
           <div class="stat-label">Total Tickets</div>
-          <div class="stat-value">${totalTickets}</div>
+          <div class="stat-value">${totalTickets.toString()}</div>
         </div>
         <div class="stat-box">
           <div class="stat-label">Completados</div>
-          <div class="stat-value">${completedTickets}</div>
+          <div class="stat-value">${completedTickets.toString()}</div>
         </div>
         <div class="stat-box">
           <div class="stat-label">Cancelados</div>
-          <div class="stat-value">${cancelledTickets}</div>
+          <div class="stat-value">${cancelledTickets.toString()}</div>
         </div>
         <div class="stat-box">
           <div class="stat-label">Redirigidos</div>
-          <div class="stat-value">${redirectedTickets}</div>
+          <div class="stat-value">${redirectedTickets.toString()}</div>
         </div>
         <div class="stat-box">
           <div class="stat-label">En espera</div>
-          <div class="stat-value">${waitingTickets}</div>
+          <div class="stat-value">${waitingTickets.toString()}</div>
         </div>
         <div class="stat-box">
           <div class="stat-label">En atención</div>
-          <div class="stat-value">${servingTickets}</div>
+          <div class="stat-value">${servingTickets.toString()}</div>
         </div>
         <div class="stat-box">
           <div class="stat-label">VIP</div>
-          <div class="stat-value">${vipTickets}</div>
+          <div class="stat-value">${vipTickets.toString()}</div>
         </div>
       </div>
       
@@ -354,7 +354,7 @@ export const printReport = async (
         ${Object.entries(serviceStats).map(([serviceType, count]) => `
           <div class="stat-box">
             <div class="stat-label">${ServiceTypeLabels[serviceType as any] || serviceType}</div>
-            <div class="stat-value">${count}</div>
+            <div class="stat-value">${count.toString()}</div>
           </div>
         `).join('')}
       </div>
@@ -395,7 +395,7 @@ export const printReport = async (
                 <td>${ticket.patientName || '-'}</td>
                 <td>${format(ticket.createdAt, 'dd/MM/yyyy HH:mm')}</td>
                 <td>${typeof waitTime === 'number' ? `${waitTime.toString()} min` : waitTime}</td>
-                <td>${getRoomDisplay(ticket.counterNumber)}</td>
+                <td>${getRoomDisplay(ticket.counterNumber ? ticket.counterNumber.toString() : null)}</td>
               </tr>
             `;
           }).join('')}

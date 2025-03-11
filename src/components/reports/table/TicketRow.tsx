@@ -53,7 +53,7 @@ const TicketRow: React.FC<TicketRowProps> = ({ ticket, getRoomDisplay }) => {
           : '-'}
       </TableCell>
       <TableCell>
-        {getRoomDisplay(ticket.counterNumber)}
+        {getRoomDisplay(ticket.counterNumber ? ticket.counterNumber.toString() : null)}
       </TableCell>
     </TableRow>
   );
