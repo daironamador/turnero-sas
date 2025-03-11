@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,11 @@ const Login = () => {
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<CompanySettings | null>(null);
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
+  
+  // Get the return URL from location state (if available)
+  const from = location.state?.from || '/';
 
   // Cargar configuración de la empresa para mostrar el logo
   useEffect(() => {
@@ -39,7 +43,7 @@ const Login = () => {
     const checkSession = async () => {
       const { data } = await supabase.auth.getSession();
       if (data.session) {
-        navigate('/');
+        navigate(from);
       }
     };
     
@@ -48,14 +52,14 @@ const Login = () => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session) {
-        navigate('/');
+        navigate(from);
       }
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [navigate]);
+  }, [navigate, from]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,15 +74,17 @@ const Login = () => {
       setLoading(true);
       console.log(`Intentando iniciar sesión con: ${email}`);
       
-      // Intentar inicio de sesión directamente con Supabase Auth
+      // Sign in with Supabase Auth (prioritize Auth)
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
       });
       
-      // Si hay un error de autenticación
+      // If there's an auth error
       if (error) {
-        // Verificar si el usuario existe en la tabla users pero no en auth
+        console.log('Error de autenticación:', error.message);
+        
+        // Check if user exists in the users table but not in auth
         const { data: userData, error: userError } = await supabase
           .from('users')
           .select('*')
@@ -88,7 +94,7 @@ const Login = () => {
         if (!userError && userData && userData.is_active) {
           console.log('El usuario existe en la tabla pero no en auth, intentando registrarlo');
           
-          // Intentar crear el usuario en auth
+          // Try to create user in auth
           const { error: signUpError } = await supabase.auth.signUp({
             email,
             password,
@@ -104,19 +110,19 @@ const Login = () => {
           
           if (signUpError) {
             if (signUpError.message.includes('email rate limit')) {
-              // Informar al usuario sobre la situación y permitir continuar
+              // Inform user about the situation and allow them to continue
               toast({
                 title: "Advertencia de autenticación",
                 description: "Hay un problema temporal con la verificación, pero puede continuar usando el sistema.",
                 variant: "default"
               });
-              navigate('/');
+              navigate(from);
               return;
             }
             throw signUpError;
           }
           
-          // Intentar iniciar sesión nuevamente
+          // Try to sign in again
           const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({
             email,
             password
@@ -131,7 +137,7 @@ const Login = () => {
             description: "Bienvenido al sistema",
           });
           
-          navigate('/');
+          navigate(from);
           return;
         }
         
@@ -143,7 +149,7 @@ const Login = () => {
         description: "Bienvenido al sistema",
       });
       
-      navigate('/');
+      navigate(from);
     } catch (error: any) {
       console.error('Login error:', error);
       setError(error.message || 'Error al iniciar sesión');
