@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Ticket, ServiceTypeLabels } from '@/lib/types';
 import { format } from 'date-fns';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -8,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Star, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { printReport } from '@/utils/printUtils';
+import { supabase } from '@/lib/supabase';
 
 interface ReportsTableProps {
   tickets: Ticket[];
@@ -17,14 +17,31 @@ interface ReportsTableProps {
 
 const ReportsTable: React.FC<ReportsTableProps> = ({ tickets, startDate, endDate }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [rooms, setRooms] = useState<{[key: string]: string}>({});
   
-  // Filtrar tickets basados en término de búsqueda
+  useEffect(() => {
+    const fetchRooms = async () => {
+      const { data, error } = await supabase
+        .from('rooms')
+        .select('id, name, number');
+      
+      if (!error && data) {
+        const roomsMap: {[key: string]: string} = {};
+        data.forEach(room => {
+          roomsMap[room.id] = `${room.number} - ${room.name}`;
+        });
+        setRooms(roomsMap);
+      }
+    };
+    
+    fetchRooms();
+  }, []);
+  
   const filteredTickets = tickets.filter(ticket => {
     const searchable = `${ticket.ticketNumber} ${ServiceTypeLabels[ticket.serviceType]} ${ticket.status} ${ticket.patientName || ''}`.toLowerCase();
     return searchable.includes(searchTerm.toLowerCase());
   });
   
-  // Calcular estadísticas
   const totalTickets = tickets.length;
   const completedTickets = tickets.filter(t => t.status === 'completed').length;
   const cancelledTickets = tickets.filter(t => t.status === 'cancelled').length;
@@ -33,7 +50,6 @@ const ReportsTable: React.FC<ReportsTableProps> = ({ tickets, startDate, endDate
   const servingTickets = tickets.filter(t => t.status === 'serving').length;
   const vipTickets = tickets.filter(t => t.isVip).length;
   
-  // Calcular estadísticas por tipo de servicio
   const serviceStats: Record<string, number> = {};
   tickets.forEach(ticket => {
     const serviceType = ticket.serviceType;
@@ -45,6 +61,16 @@ const ReportsTable: React.FC<ReportsTableProps> = ({ tickets, startDate, endDate
 
   const handlePrintReport = () => {
     printReport(tickets, startDate, endDate);
+  };
+  
+  const getRoomDisplay = (counterNumber: string | null) => {
+    if (!counterNumber) return '-';
+    
+    if (counterNumber.includes('-')) {
+      return rooms[counterNumber] || counterNumber;
+    }
+    
+    return counterNumber;
   };
   
   return (
@@ -118,7 +144,6 @@ const ReportsTable: React.FC<ReportsTableProps> = ({ tickets, startDate, endDate
         </TableHeader>
         <TableBody>
           {filteredTickets.map((ticket) => {
-            // Calcular tiempo de espera
             const waitTimeMinutes = ticket.calledAt && ticket.createdAt 
               ? Math.round((ticket.calledAt.getTime() - ticket.createdAt.getTime()) / (1000 * 60))
               : null;
@@ -184,7 +209,7 @@ const ReportsTable: React.FC<ReportsTableProps> = ({ tickets, startDate, endDate
                     : '-'}
                 </TableCell>
                 <TableCell>
-                  {ticket.counterNumber || '-'}
+                  {getRoomDisplay(ticket.counterNumber)}
                 </TableCell>
               </TableRow>
             );

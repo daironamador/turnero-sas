@@ -1,4 +1,3 @@
-
 import { format } from 'date-fns';
 import { Ticket, ServiceTypeLabels, CompanySettings } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
@@ -21,6 +20,30 @@ const getCompanySettings = async (): Promise<CompanySettings | null> => {
   } catch (error) {
     console.error('Error al obtener configuración de la empresa:', error);
     return null;
+  }
+};
+
+// Obtener mapa de salas/habitaciones
+const getRoomsMap = async (): Promise<{[key: string]: string}> => {
+  try {
+    const { data, error } = await supabase
+      .from('rooms')
+      .select('id, name, number');
+    
+    if (error) {
+      console.error('Error al obtener salas:', error);
+      return {};
+    }
+    
+    const roomsMap: {[key: string]: string} = {};
+    data.forEach(room => {
+      roomsMap[room.id] = `${room.number} - ${room.name}`;
+    });
+    
+    return roomsMap;
+  } catch (error) {
+    console.error('Error al obtener salas:', error);
+    return {};
   }
 };
 
@@ -150,6 +173,9 @@ export const printReport = async (
   // Obtener la configuración de la empresa
   const companySettings = await getCompanySettings();
   
+  // Obtener mapa de salas
+  const roomsMap = await getRoomsMap();
+  
   // Crear una nueva ventana para imprimir
   const printWindow = window.open('', '', 'width=800,height=600');
   
@@ -157,6 +183,18 @@ export const printReport = async (
     alert('Por favor, permita ventanas emergentes para este sitio para imprimir reportes');
     return;
   }
+  
+  // Helper function to get room display name
+  const getRoomDisplay = (counterNumber: string | null | undefined) => {
+    if (!counterNumber) return '-';
+    
+    // Check if the counterNumber is a UUID (room id) or just a number
+    if (counterNumber.includes('-')) {
+      return roomsMap[counterNumber] || counterNumber;
+    }
+    
+    return counterNumber;
+  };
   
   // Calcular estadísticas
   const totalTickets = tickets.length;
@@ -357,7 +395,7 @@ export const printReport = async (
                 <td>${ticket.patientName || '-'}</td>
                 <td>${format(ticket.createdAt, 'dd/MM/yyyy HH:mm')}</td>
                 <td>${typeof waitTime === 'number' ? `${waitTime} min` : waitTime}</td>
-                <td>${ticket.counterNumber || '-'}</td>
+                <td>${getRoomDisplay(ticket.counterNumber)}</td>
               </tr>
             `;
           }).join('')}
