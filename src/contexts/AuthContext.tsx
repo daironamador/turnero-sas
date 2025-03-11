@@ -26,16 +26,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const refreshUser = async () => {
-    // Prevent too frequent refreshes (minimum 5 seconds between refreshes)
+    // Reduce refresh frequency by increasing minimum time between refreshes to 10 seconds
     const now = Date.now();
-    if (now - lastRefreshTime < 5000) {
-      console.log('Skipping refresh - too soon since last refresh');
+    if (now - lastRefreshTime < 10000) {
+      // Don't log every time to reduce console spam
       return;
     }
     
     // Prevent concurrent refreshes
     if (isRefreshing) {
-      console.log('Skipping refresh - already refreshing');
       return;
     }
     
@@ -150,7 +149,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.error('Error during session check:', error);
         }
       }
-    }, 15 * 60 * 1000); // Check every 15 minutes instead of 5
+    }, 30 * 60 * 1000); // Check every 30 minutes instead of 15
 
     return () => {
       subscription.unsubscribe();
