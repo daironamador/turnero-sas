@@ -232,28 +232,28 @@ export const getTodayStats = async () => {
   const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
 
   // Obtener conteos de tickets por estado para hoy
-  const { count: waitingCount, error: waitingError } = await supabase
+  const { data: waitingData, error: waitingError, count: waitingCount } = await supabase
     .from('tickets')
     .select('*', { count: 'exact', head: true })
     .eq('status', 'waiting')
     .gte('created_at', startOfDay)
     .lt('created_at', endOfDay);
 
-  const { count: servingCount, error: servingError } = await supabase
+  const { data: servingData, error: servingError, count: servingCount } = await supabase
     .from('tickets')
     .select('*', { count: 'exact', head: true })
     .eq('status', 'serving')
     .gte('created_at', startOfDay)
     .lt('created_at', endOfDay);
 
-  const { count: completedCount, error: completedError } = await supabase
+  const { data: completedData, error: completedError, count: completedCount } = await supabase
     .from('tickets')
     .select('*', { count: 'exact', head: true })
     .eq('status', 'completed')
     .gte('created_at', startOfDay)
     .lt('created_at', endOfDay);
 
-  const { count: cancelledCount, error: cancelledError } = await supabase
+  const { data: cancelledData, error: cancelledError, count: cancelledCount } = await supabase
     .from('tickets')
     .select('*', { count: 'exact', head: true })
     .eq('status', 'cancelled')

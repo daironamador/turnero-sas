@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Input } from "@/components/ui/input";
@@ -19,7 +20,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Service, Ticket, Room } from '@/lib/types';
+import { Service, Ticket, Room, ServiceType } from '@/lib/types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { CheckCheck, ChevronsUpDown, PhoneCall, UserPlus, XCircle } from 'lucide-react';
@@ -31,28 +32,11 @@ import {
   redirectTicket
 } from '@/services/ticketService';
 
-// Define updateTicketStatus locally, don't import it
-const updateTicketStatus = async (ticketId: string, status: string, counterNumber?: number) => {
-  try {
-    const updates = {
-      status,
-      counter_number: counterNumber,
-      ...(status === 'serving' ? { called_at: new Date().toISOString() } : {}),
-      ...(status === 'completed' ? { completed_at: new Date().toISOString() } : {})
-    };
-
-    const { error } = await supabase
-      .from('tickets')
-      .update(updates)
-      .eq('id', ticketId);
-
-    if (error) throw error;
-    return { success: true };
-  } catch (error) {
-    console.error('Error updating ticket status:', error);
-    return { success: false, error };
-  }
-};
+// Define types for mutation parameters
+type CallTicketParams = { ticketId: string; counterNumber: number };
+type CompleteTicketParams = { ticketId: string };
+type CancelTicketParams = { ticketId: string };
+type RedirectTicketParams = { ticketId: string; serviceType: ServiceType };
 
 interface TicketManagerProps {
   currentTicket?: Ticket;
@@ -76,7 +60,9 @@ const TicketManager: React.FC<TicketManagerProps> = ({
   const [selectedService, setSelectedService] = useState<string | undefined>(undefined);
 
   // Mutations
-  const callTicketMutation = useMutation(callTicket, {
+  const callTicketMutation = useMutation({
+    mutationFn: ({ ticketId, counterNumber }: CallTicketParams) => 
+      callTicket(ticketId, counterNumber),
     onSuccess: () => {
       toast({
         title: "Ticket llamado",
@@ -93,7 +79,8 @@ const TicketManager: React.FC<TicketManagerProps> = ({
     },
   });
 
-  const completeTicketMutation = useMutation(completeTicket, {
+  const completeTicketMutation = useMutation({
+    mutationFn: ({ ticketId }: CompleteTicketParams) => completeTicket(ticketId),
     onSuccess: () => {
       toast({
         title: "Ticket completado",
@@ -110,7 +97,8 @@ const TicketManager: React.FC<TicketManagerProps> = ({
     },
   });
 
-  const cancelTicketMutation = useMutation(cancelTicket, {
+  const cancelTicketMutation = useMutation({
+    mutationFn: ({ ticketId }: CancelTicketParams) => cancelTicket(ticketId),
     onSuccess: () => {
       toast({
         title: "Ticket cancelado",
@@ -127,7 +115,9 @@ const TicketManager: React.FC<TicketManagerProps> = ({
     },
   });
 
-  const redirectTicketMutation = useMutation(redirectTicket, {
+  const redirectTicketMutation = useMutation({
+    mutationFn: ({ ticketId, serviceType }: RedirectTicketParams) => 
+      redirectTicket(ticketId, serviceType as ServiceType),
     onSuccess: () => {
       toast({
         title: "Ticket redirigido",
@@ -146,22 +136,32 @@ const TicketManager: React.FC<TicketManagerProps> = ({
 
   const handleCallNext = async () => {
     if (!currentTicket) return;
-    callTicketMutation.mutate({ ticketId: currentTicket.id, counterNumber });
+    callTicketMutation.mutate({ 
+      ticketId: currentTicket.id, 
+      counterNumber 
+    });
   };
 
   const handleComplete = async () => {
     if (!currentTicket) return;
-    completeTicketMutation.mutate({ ticketId: currentTicket.id });
+    completeTicketMutation.mutate({ 
+      ticketId: currentTicket.id 
+    });
   };
 
   const handleCancel = async () => {
     if (!currentTicket) return;
-    cancelTicketMutation.mutate({ ticketId: currentTicket.id });
+    cancelTicketMutation.mutate({ 
+      ticketId: currentTicket.id 
+    });
   };
 
   const handleRedirect = async () => {
     if (!currentTicket || !selectedService) return;
-    redirectTicketMutation.mutate({ ticketId: currentTicket.id, serviceType: selectedService });
+    redirectTicketMutation.mutate({ 
+      ticketId: currentTicket.id, 
+      serviceType: selectedService as ServiceType 
+    });
     setIsRedirectDialogOpen(false);
   };
 
@@ -209,14 +209,14 @@ const TicketManager: React.FC<TicketManagerProps> = ({
             <Button 
               variant="destructive" 
               onClick={handleCancel} 
-              disabled={cancelTicketMutation.isLoading}
+              disabled={cancelTicketMutation.isPending}
             >
-              {cancelTicketMutation.isLoading ? 'Cancelando...' : 'Cancelar'}
+              {cancelTicketMutation.isPending ? 'Cancelando...' : 'Cancelar'}
               <XCircle className="w-4 h-4 ml-2" />
             </Button>
             <Button 
               onClick={() => setIsRedirectDialogOpen(true)}
-              disabled={redirectTicketMutation.isLoading}
+              disabled={redirectTicketMutation.isPending}
             >
               Redirigir
               <ChevronsUpDown className="w-4 h-4 ml-2" />
@@ -224,9 +224,9 @@ const TicketManager: React.FC<TicketManagerProps> = ({
             <Button 
               variant="secondary" 
               onClick={handleComplete} 
-              disabled={completeTicketMutation.isLoading}
+              disabled={completeTicketMutation.isPending}
             >
-              {completeTicketMutation.isLoading ? 'Completando...' : 'Completar'}
+              {completeTicketMutation.isPending ? 'Completando...' : 'Completar'}
               <CheckCheck className="w-4 h-4 ml-2" />
             </Button>
           </div>
@@ -243,9 +243,9 @@ const TicketManager: React.FC<TicketManagerProps> = ({
           <Button 
             className="w-full"
             onClick={handleCallNext} 
-            disabled={callTicketMutation.isLoading || !waitingTickets.length}
+            disabled={callTicketMutation.isPending || !waitingTickets.length}
           >
-            {callTicketMutation.isLoading ? 'Llamando...' : 'Llamar Siguiente'}
+            {callTicketMutation.isPending ? 'Llamando...' : 'Llamar Siguiente'}
             <PhoneCall className="w-4 h-4 ml-2" />
           </Button>
         </div>
