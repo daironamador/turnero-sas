@@ -63,7 +63,7 @@ export function useTicketUpdates({
             // Only announce if this is a new call (not already announced)
             // For recalled tickets, we always want to announce them
             // Check if this is a recall (previous status was not 'waiting')
-            const isRecall = payload.old.status && payload.old.status !== 'waiting';
+            const isRecall = payload.old && payload.old.status && payload.old.status !== 'waiting';
             
             if (isRecall || lastAnnounced !== calledTicket.id) {
               // Find room name for current counter
