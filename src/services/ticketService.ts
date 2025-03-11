@@ -227,56 +227,50 @@ function mapDatabaseTicketToTicket(dbTicket: any): Ticket {
 
 // Obtener estadísticas de los tickets de hoy
 export const getTodayStats = async () => {
-  const today = new Date();
-  const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
-  const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).toISOString();
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+  const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
 
   // Obtener conteos de tickets por estado para hoy
-  const { data: waitingData, error: waitingError } = await supabase
+  const { count: waitingCount, error: waitingError } = await supabase
     .from('tickets')
-    .select('count', { count: 'exact', head: true })
+    .select('*', { count: 'exact', head: true })
     .eq('status', 'waiting')
     .gte('created_at', startOfDay)
     .lt('created_at', endOfDay);
 
-  const { data: servingData, error: servingError } = await supabase
+  const { count: servingCount, error: servingError } = await supabase
     .from('tickets')
-    .select('count', { count: 'exact', head: true })
+    .select('*', { count: 'exact', head: true })
     .eq('status', 'serving')
     .gte('created_at', startOfDay)
     .lt('created_at', endOfDay);
 
-  const { data: completedData, error: completedError } = await supabase
+  const { count: completedCount, error: completedError } = await supabase
     .from('tickets')
-    .select('count', { count: 'exact', head: true })
+    .select('*', { count: 'exact', head: true })
     .eq('status', 'completed')
     .gte('created_at', startOfDay)
     .lt('created_at', endOfDay);
 
-  const { data: cancelledData, error: cancelledError } = await supabase
+  const { count: cancelledCount, error: cancelledError } = await supabase
     .from('tickets')
-    .select('count', { count: 'exact', head: true })
+    .select('*', { count: 'exact', head: true })
     .eq('status', 'cancelled')
     .gte('created_at', startOfDay)
     .lt('created_at', endOfDay);
 
   if (waitingError || servingError || completedError || cancelledError) {
-    console.error('Error al obtener estadísticas de tickets');
+    console.error('Error getting statistics:', waitingError || servingError || completedError || cancelledError);
     throw new Error('No se pudieron obtener las estadísticas de tickets');
   }
 
-  // Access count property from the response object, not from data array
-  const waitingCount = waitingData?.count || 0;
-  const servingCount = servingData?.count || 0;
-  const completedCount = completedData?.count || 0;
-  const cancelledCount = cancelledData?.count || 0;
-
   return {
-    waiting: waitingCount,
-    serving: servingCount,
-    completed: completedCount,
-    cancelled: cancelledCount,
-    total: waitingCount + servingCount + completedCount + cancelledCount
+    waiting: waitingCount || 0,
+    serving: servingCount || 0,
+    completed: completedCount || 0,
+    cancelled: cancelledCount || 0,
+    total: (waitingCount || 0) + (servingCount || 0) + (completedCount || 0) + (cancelledCount || 0)
   };
 };
 
