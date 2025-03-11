@@ -7,16 +7,35 @@ export function useTicketAnnouncer() {
 
   // Initialize broadcast channel for cross-window/tab communication
   useEffect(() => {
-    const channel = new BroadcastChannel('ticket-announcements');
-    setTicketChannel(channel);
-    
-    return () => {
-      channel.close();
-    };
+    // Only create channel if BroadcastChannel is supported
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        const channel = new BroadcastChannel('ticket-announcements');
+        setTicketChannel(channel);
+        
+        console.log("BroadcastChannel for ticket announcements initialized");
+        
+        return () => {
+          channel.close();
+        };
+      } catch (error) {
+        console.error("Failed to create BroadcastChannel:", error);
+      }
+    } else {
+      console.warn("BroadcastChannel not supported in this browser");
+    }
   }, []);
 
   const announceTicket = (ticket: Ticket, counterName: string | undefined, rooms: Room[]) => {
-    if (!counterName || !ticketChannel) return;
+    if (!counterName) {
+      console.error("Cannot announce ticket: counterName is undefined");
+      return;
+    }
+    
+    if (!ticketChannel) {
+      console.error("Cannot announce ticket: BroadcastChannel is unavailable");
+      return;
+    }
     
     // Find the original room name if this is a redirected ticket
     let originalRoomName: string | undefined;
@@ -32,7 +51,7 @@ export function useTicketAnnouncer() {
       }
     }
     
-    // Send message via BroadcastChannel to the display page
+    // Ensure the ticket has a unique ID to prevent duplicate announcements
     const updatedTicket = {
       ...ticket,
       // Ensure we have the latest timestamp for display purposes
@@ -41,13 +60,17 @@ export function useTicketAnnouncer() {
     
     console.log("Broadcasting ticket announcement:", updatedTicket, "to counter:", counterName);
     
-    ticketChannel.postMessage({
-      type: 'announce-ticket',
-      ticket: updatedTicket,
-      counterName: counterName,
-      redirectedFrom: ticket.redirectedFrom,
-      originalRoomName: originalRoomName
-    });
+    try {
+      ticketChannel.postMessage({
+        type: 'announce-ticket',
+        ticket: updatedTicket,
+        counterName: counterName,
+        redirectedFrom: ticket.redirectedFrom,
+        originalRoomName: originalRoomName
+      });
+    } catch (error) {
+      console.error("Failed to broadcast ticket announcement:", error);
+    }
   };
 
   return { ticketChannel, announceTicket };

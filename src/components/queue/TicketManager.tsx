@@ -94,9 +94,9 @@ const TicketManager: React.FC<TicketManagerProps> = ({
         // Ensure we're using a proper type-safe status by explicitly setting it as a literal
         const updatedTicket: Ticket = {
           ...ticket,
-          status: 'serving', // Now using a string literal matching the Ticket type
+          status: 'serving' as const, // Fixed type issue with status
           calledAt: new Date(),
-          counterNumber: counterNumber
+          counterNumber: Number(counterNumber) // Convert to number
         };
         
         announceTicket(updatedTicket, counterName, rooms);

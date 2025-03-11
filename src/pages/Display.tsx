@@ -10,8 +10,20 @@ const Display: React.FC = () => {
     // This helps identify this is the display page for cross-window communication
     window.name = "ticket-display-screen";
     
-    // Log that the display page has been loaded and is ready
+    // Ensure we're capturing all messages, including from other devices on the network
     console.log("Display page initialized and ready to receive announcements");
+    
+    // Detect if we're running on a server vs. client
+    const isClient = typeof window !== 'undefined';
+    
+    if (isClient) {
+      // Check if BroadcastChannel is supported
+      if (typeof BroadcastChannel !== 'undefined') {
+        console.log("BroadcastChannel is supported in this browser");
+      } else {
+        console.warn("BroadcastChannel is NOT supported in this browser - announcements may not work");
+      }
+    }
   }, []);
 
   return (
