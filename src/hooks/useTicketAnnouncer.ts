@@ -4,6 +4,8 @@ import { Room, Ticket } from '@/lib/types';
 
 export function useTicketAnnouncer() {
   const [ticketChannel, setTicketChannel] = useState<BroadcastChannel | null>(null);
+  const [announcementQueue, setAnnouncementQueue] = useState<any[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Initialize broadcast channel for cross-window/tab communication
   useEffect(() => {
@@ -26,14 +28,35 @@ export function useTicketAnnouncer() {
     }
   }, []);
 
+  // Process the announcement queue
+  useEffect(() => {
+    if (announcementQueue.length > 0 && !isProcessing && ticketChannel) {
+      setIsProcessing(true);
+      
+      // Get the next announcement
+      const nextAnnouncement = announcementQueue[0];
+      
+      // Remove it from the queue
+      setAnnouncementQueue(prev => prev.slice(1));
+      
+      // Send the announcement
+      try {
+        ticketChannel.postMessage(nextAnnouncement);
+        console.log("Sent announcement from queue:", nextAnnouncement);
+      } catch (error) {
+        console.error("Failed to send queued announcement:", error);
+      }
+      
+      // Allow the next announcement after a delay
+      setTimeout(() => {
+        setIsProcessing(false);
+      }, 2000);
+    }
+  }, [announcementQueue, isProcessing, ticketChannel]);
+
   const announceTicket = (ticket: Ticket, counterName: string | undefined, rooms: Room[]) => {
     if (!counterName) {
       console.error("Cannot announce ticket: counterName is undefined");
-      return;
-    }
-    
-    if (!ticketChannel) {
-      console.error("Cannot announce ticket: BroadcastChannel is unavailable");
       return;
     }
     
@@ -58,18 +81,31 @@ export function useTicketAnnouncer() {
       calledAt: new Date()
     };
     
-    console.log("Broadcasting ticket announcement:", updatedTicket, "to counter:", counterName);
+    const announcement = {
+      type: 'announce-ticket',
+      ticket: updatedTicket,
+      counterName: counterName,
+      redirectedFrom: ticket.redirectedFrom,
+      originalRoomName: originalRoomName
+    };
+    
+    console.log("Preparing ticket announcement:", updatedTicket, "to counter:", counterName);
+    
+    // If we don't have a channel yet or if we're already processing, queue the announcement
+    if (!ticketChannel || isProcessing) {
+      console.log("Queueing announcement because", !ticketChannel ? "no channel" : "already processing");
+      setAnnouncementQueue(prev => [...prev, announcement]);
+      return;
+    }
     
     try {
-      ticketChannel.postMessage({
-        type: 'announce-ticket',
-        ticket: updatedTicket,
-        counterName: counterName,
-        redirectedFrom: ticket.redirectedFrom,
-        originalRoomName: originalRoomName
-      });
+      ticketChannel.postMessage(announcement);
+      console.log("Broadcast ticket announcement sent successfully");
     } catch (error) {
       console.error("Failed to broadcast ticket announcement:", error);
+      
+      // If sending fails, add to queue
+      setAnnouncementQueue(prev => [...prev, announcement]);
     }
   };
 

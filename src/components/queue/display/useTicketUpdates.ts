@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useSpeechSynthesis } from './useSpeechSynthesis';
@@ -25,8 +25,49 @@ export function useTicketUpdates({
 }: UseTicketUpdatesProps) {
   const queryClient = useQueryClient();
   const { announceTicket } = useSpeechSynthesis();
+  const [processingAnnouncement, setProcessingAnnouncement] = useState(false);
   
-  // Set up real-time listener for ticket changes
+  const processTicketAnnouncement = (
+    ticket: Ticket, 
+    counterName: string, 
+    redirectedFrom?: string, 
+    originalRoomName?: string
+  ) => {
+    if (lastAnnounced === ticket.id && Date.now() - (ticket.calledAt?.getTime() || 0) < 3000) {
+      console.log(`Skipping already announced ticket ${ticket.id}`);
+      return;
+    }
+
+    console.log(`Processing announcement for ticket ${ticket.ticketNumber} on display`);
+    
+    setNewlyCalledTicket(ticket);
+    
+    if (counterName) {
+      console.log(`Announcing ticket ${ticket.ticketNumber} to ${counterName}`);
+      
+      setProcessingAnnouncement(true);
+      
+      try {
+        announceTicket(
+          ticket.ticketNumber,
+          counterName,
+          redirectedFrom,
+          originalRoomName
+        );
+      } catch (error) {
+        console.error('Error announcing ticket:', error);
+      } finally {
+        setLastAnnounced(ticket.id);
+        
+        setTimeout(() => {
+          setProcessingAnnouncement(false);
+        }, 3000);
+      }
+    } else {
+      console.error('Missing room name for announcement');
+    }
+  };
+  
   useEffect(() => {
     const channel = supabase.channel('schema-db-changes')
       .on('postgres_changes', 
@@ -38,60 +79,29 @@ export function useTicketUpdates({
         (payload) => {
           console.info('Cambio en tickets recibido!', payload);
           
-          // Refresh the queries to get updated data
           queryClient.invalidateQueries({ queryKey: ['servingTickets'] });
           queryClient.invalidateQueries({ queryKey: ['waitingTickets'] });
         });
     
     channel.subscribe();
     
-    // Create BroadcastChannel to listen for announcements from Call page
     let ticketChannel: BroadcastChannel | null = null;
     
-    // Check if BroadcastChannel is supported in this browser
     if (typeof BroadcastChannel !== 'undefined') {
       try {
         ticketChannel = new BroadcastChannel('ticket-announcements');
         console.log('BroadcastChannel for ticket-announcements created successfully');
         
         ticketChannel.onmessage = (event) => {
+          if (!event.data) return;
+          
           console.log('Received broadcast message in useTicketUpdates:', event.data);
           
-          if (event.data.type === 'announce-ticket') {
+          if (event.data.type === 'announce-ticket' && !processingAnnouncement) {
             const { ticket, counterName, redirectedFrom, originalRoomName } = event.data;
             
             if (ticket) {
-              // Prevent double processing the same ticket
-              if (lastAnnounced === ticket.id) {
-                console.log(`Skipping already announced ticket ${ticket.id}`);
-                return;
-              }
-              
-              console.log(`Processing announcement for ticket ${ticket.ticketNumber} on display`);
-              
-              // Update the display with the notification
-              setNewlyCalledTicket(ticket);
-              
-              // Get the correct room name - use provided counterName or find it based on counterNumber
-              let roomNameToUse = counterName;
-              
-              // Check if we received a valid counterName from the broadcast
-              if (roomNameToUse) {
-                console.log(`Announcing ticket ${ticket.ticketNumber} to room ${roomNameToUse}`);
-                
-                // Announce the ticket with the provided room name
-                announceTicket(
-                  ticket.ticketNumber,
-                  roomNameToUse,
-                  redirectedFrom,
-                  originalRoomName
-                );
-                
-                // Keep track of the last announced ticket ID
-                setLastAnnounced(ticket.id);
-              } else {
-                console.error('Missing room name for announcement');
-              }
+              processTicketAnnouncement(ticket, counterName, redirectedFrom, originalRoomName);
             }
           }
         };
@@ -117,11 +127,11 @@ export function useTicketUpdates({
     roomsQuery.data, 
     announceTicket, 
     setNewlyCalledTicket,
-    lastAnnounced, // Keep this dependency to listen for changes
-    setLastAnnounced
+    lastAnnounced,
+    setLastAnnounced,
+    processingAnnouncement
   ]);
   
-  // Clear notification after 10 seconds
   useEffect(() => {
     if (newlyCalledTicket) {
       const timer = setTimeout(() => {

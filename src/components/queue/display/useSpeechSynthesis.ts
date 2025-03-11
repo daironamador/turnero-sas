@@ -3,18 +3,39 @@ import { useEffect, useState, useCallback } from 'react';
 
 export function useSpeechSynthesis() {
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   
   // Make sure voices are loaded
   useEffect(() => {
     const loadVoices = () => {
-      const availableVoices = window.speechSynthesis.getVoices();
-      setVoices(availableVoices);
+      if (window.speechSynthesis) {
+        const availableVoices = window.speechSynthesis.getVoices();
+        setVoices(availableVoices);
+        console.log("Loaded voices:", availableVoices.length);
+      }
     };
     
     loadVoices();
-    if (window.speechSynthesis.onvoiceschanged !== undefined) {
+    if (window.speechSynthesis?.onvoiceschanged !== undefined) {
       window.speechSynthesis.onvoiceschanged = loadVoices;
     }
+
+    // Ensure speech synthesis is not paused when page visibility changes
+    const handleVisibilityChange = () => {
+      if (window.speechSynthesis) {
+        if (document.hidden) {
+          window.speechSynthesis.pause();
+        } else {
+          window.speechSynthesis.resume();
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   // Format the ticket number to spell out service code letters and format the numeric part
@@ -62,7 +83,13 @@ export function useSpeechSynthesis() {
     redirectedFrom?: string, 
     originalRoomName?: string
   ) => {
-    if (!window.speechSynthesis) return;
+    if (!window.speechSynthesis) {
+      console.error("Speech synthesis not supported in this browser");
+      return;
+    }
+
+    // Cancel any ongoing speech
+    window.speechSynthesis.cancel();
     
     const formattedNumber = formatTicketNumber(ticketNumber);
     
@@ -120,10 +147,33 @@ export function useSpeechSynthesis() {
     console.log(`Using voice: ${speech.voice?.name || 'Default'} (${speech.lang})`);
     console.log(`Saying: "${speech.text}"`);
     
-    window.speechSynthesis.speak(speech);
+    // Set up speech events to track speaking state
+    speech.onstart = () => {
+      setIsSpeaking(true);
+      console.log("Speech started");
+    };
+    
+    speech.onend = () => {
+      setIsSpeaking(false);
+      console.log("Speech ended");
+    };
+    
+    speech.onerror = (event) => {
+      console.error("Speech error:", event);
+      setIsSpeaking(false);
+    };
+    
+    // Ensure utterance is spoken and not ignored by the browser
+    setTimeout(() => {
+      try {
+        window.speechSynthesis.speak(speech);
+      } catch (error) {
+        console.error("Error speaking:", error);
+      }
+    }, 100);
     
     return announcementText;
   }, [voices]);
 
-  return { announceTicket };
+  return { announceTicket, isSpeaking };
 }
