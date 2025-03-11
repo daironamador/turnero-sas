@@ -6,10 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { getCompanySettings } from '@/services/settingsService';
 import { CompanySettings } from '@/lib/types';
 import { useAuth } from '@/contexts/AuthContext';
-
-// Constantes para las claves de localStorage
-const TOKEN_KEY = 'sb-access-token';
-const REFRESH_TOKEN_KEY = 'sb-refresh-token';
+import { getAuthTokens, storeAuthTokens } from '@/lib/authUtils';
 
 export const useLoginState = () => {
   const [loading, setLoading] = useState(false);
@@ -56,11 +53,10 @@ export const useLoginState = () => {
         }
         
         console.log('Login: No active session, checking localStorage...');
-        // Check localStorage for tokens using the same keys as in AuthContext
-        const storedToken = localStorage.getItem(TOKEN_KEY);
-        const storedRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+        // Check localStorage for tokens
+        const { accessToken, refreshToken } = getAuthTokens();
         
-        if (storedToken && storedRefreshToken) {
+        if (accessToken && refreshToken) {
           console.log('Login: Found stored tokens, attempting to restore');
           const success = await refreshUser();
           
@@ -163,6 +159,14 @@ export const useLoginState = () => {
             description: "Bienvenido al sistema",
           });
           
+          // Store tokens after successful login
+          if (retryData && retryData.session) {
+            storeAuthTokens(
+              retryData.session.access_token, 
+              retryData.session.refresh_token
+            );
+          }
+          
           navigate(from, { replace: true });
           return;
         }
@@ -174,12 +178,10 @@ export const useLoginState = () => {
       
       // Store tokens explicitly in localStorage
       if (data && data.session) {
-        const token = data.session.access_token;
-        const refreshToken = data.session.refresh_token;
-        
-        // Store using the same keys as in AuthContext
-        localStorage.setItem(TOKEN_KEY, token);
-        localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+        storeAuthTokens(
+          data.session.access_token,
+          data.session.refresh_token
+        );
       }
       
       toast({

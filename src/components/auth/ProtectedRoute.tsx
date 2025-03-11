@@ -4,15 +4,12 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
+import { getAuthTokens } from '@/lib/authUtils';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
   allowedRoles?: string[];
 }
-
-// Constantes para las claves de localStorage
-const TOKEN_KEY = 'sb-access-token';
-const REFRESH_TOKEN_KEY = 'sb-refresh-token';
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
   children,
@@ -37,10 +34,9 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         }
         
         // If no active session, check localStorage and try to restore
-        const storedToken = localStorage.getItem(TOKEN_KEY);
-        const storedRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+        const { accessToken, refreshToken } = getAuthTokens();
         
-        if (storedToken && storedRefreshToken) {
+        if (accessToken && refreshToken) {
           console.log('ProtectedRoute: No active session, but found stored tokens, attempting to refresh');
           const refreshed = await refreshUser();
           console.log('ProtectedRoute: Session refresh result:', refreshed);
