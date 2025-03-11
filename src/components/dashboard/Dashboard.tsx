@@ -7,20 +7,24 @@ import StatsCard from './StatsCard';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-
-// Mock data for demonstration
-const mockQueueStats = [
-  { serviceType: 'CG' as ServiceType, waitingCount: 4, inService: 1 },
-  { serviceType: 'RX' as ServiceType, waitingCount: 2, inService: 1 },
-  { serviceType: 'RR' as ServiceType, waitingCount: 3, inService: 0 },
-  { serviceType: 'EX' as ServiceType, waitingCount: 1, inService: 0 },
-  { serviceType: 'OT' as ServiceType, waitingCount: 0, inService: 0 },
-];
+import { useDashboardData } from './useDashboardData';
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const currentDate = new Date();
   const formattedDate = format(currentDate, "EEEE, dd 'de' MMMM, yyyy");
+  
+  // Use our custom hook to fetch data
+  const { statsQuery, countersQuery, queueStatsQuery } = useDashboardData();
+  
+  // Extract data for easier access
+  const todayStats = statsQuery.data || { total: 0, waiting: 0, completed: 0 };
+  const activeCounters = countersQuery.data?.length || 0;
+  const queueStats = queueStatsQuery.data || [];
+  
+  // Loading states for different sections
+  const isStatsLoading = statsQuery.isLoading;
+  const isQueueStatsLoading = queueStatsQuery.isLoading;
   
   return (
     <div className="space-y-8 animate-slide-down">
@@ -54,31 +58,45 @@ const Dashboard: React.FC = () => {
       <div>
         <h2 className="text-xl font-semibold mb-4">Resumen del Día</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatsCard 
-            title="Tickets hoy" 
-            value={42} 
-            icon={Ticket} 
-            trend={5}
-            iconClassName="bg-blue-100/50"
-          />
-          <StatsCard 
-            title="En espera" 
-            value={mockQueueStats.reduce((acc, q) => acc + q.waitingCount, 0)} 
-            icon={Clock} 
-            iconClassName="bg-purple-100/50"
-          />
-          <StatsCard 
-            title="Atendidos hoy" 
-            value={37} 
-            icon={CheckCheck} 
-            iconClassName="bg-green-100/50"
-          />
-          <StatsCard 
-            title="Ventanillas activas" 
-            value={2} 
-            icon={Users} 
-            iconClassName="bg-amber-100/50"
-          />
+          {isStatsLoading ? (
+            // Show skeleton loaders when loading
+            Array(4).fill(0).map((_, i) => (
+              <Card key={i} className="overflow-hidden">
+                <CardContent className="p-6">
+                  <div className="h-20 flex items-center justify-center">
+                    <div className="animate-pulse h-4 bg-gray-200 rounded w-3/4"></div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <>
+              <StatsCard 
+                title="Tickets hoy" 
+                value={todayStats.total} 
+                icon={Ticket} 
+                iconClassName="bg-blue-100/50"
+              />
+              <StatsCard 
+                title="En espera" 
+                value={todayStats.waiting} 
+                icon={Clock} 
+                iconClassName="bg-purple-100/50"
+              />
+              <StatsCard 
+                title="Atendidos hoy" 
+                value={todayStats.completed} 
+                icon={CheckCheck} 
+                iconClassName="bg-green-100/50"
+              />
+              <StatsCard 
+                title="Ventanillas activas" 
+                value={activeCounters} 
+                icon={Users} 
+                iconClassName="bg-amber-100/50"
+              />
+            </>
+          )}
         </div>
       </div>
 
@@ -86,36 +104,49 @@ const Dashboard: React.FC = () => {
       <div>
         <h2 className="text-xl font-semibold mb-4">Estado de las Colas</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          {mockQueueStats.map((queue) => (
-            <Card key={queue.serviceType} className="hover-scale">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-md">
-                  {ServiceTypeLabels[queue.serviceType]}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-2xl font-bold text-ocular-700">
-                        {queue.waitingCount}
-                      </span>
-                      <span className="text-sm text-gray-500">en espera</span>
+          {isQueueStatsLoading ? (
+            // Show skeleton loaders when loading
+            Array(5).fill(0).map((_, i) => (
+              <Card key={i} className="overflow-hidden">
+                <CardContent className="p-6">
+                  <div className="h-24 flex items-center justify-center">
+                    <div className="animate-pulse h-4 bg-gray-200 rounded w-3/4"></div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            queueStats.map((queue) => (
+              <Card key={queue.serviceType} className="hover-scale">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-md">
+                    {ServiceTypeLabels[queue.serviceType]}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-2xl font-bold text-ocular-700">
+                          {queue.waitingCount}
+                        </span>
+                        <span className="text-sm text-gray-500">en espera</span>
+                      </div>
+                      <div className="flex items-baseline gap-1 mt-1">
+                        <span className="text-lg font-medium text-ocular-600">
+                          {queue.inService}
+                        </span>
+                        <span className="text-sm text-gray-500">en atención</span>
+                      </div>
                     </div>
-                    <div className="flex items-baseline gap-1 mt-1">
-                      <span className="text-lg font-medium text-ocular-600">
-                        {queue.inService}
-                      </span>
-                      <span className="text-sm text-gray-500">en atención</span>
+                    <div className="w-12 h-12 bg-ocular-100 rounded-full flex items-center justify-center">
+                      <span className="text-lg font-bold text-ocular-600">{queue.serviceType}</span>
                     </div>
                   </div>
-                  <div className="w-12 h-12 bg-ocular-100 rounded-full flex items-center justify-center">
-                    <span className="text-lg font-bold text-ocular-600">{queue.serviceType}</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            ))
+          )}
         </div>
         
         <div className="flex justify-end mt-3">
