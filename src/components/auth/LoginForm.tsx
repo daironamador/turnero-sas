@@ -87,11 +87,11 @@ const LoginForm: React.FC<LoginFormProps> = ({
           <div className="flex items-center space-x-2">
             <Checkbox 
               id="rememberMe" 
-              checked={rememberMe} 
-              onCheckedChange={(checked) => setRememberMe(checked === true)}
+              checked={true}
+              disabled={true}
             />
-            <Label htmlFor="rememberMe" className="text-sm font-normal cursor-pointer">
-              Permanecer conectado incluso si cierra el navegador
+            <Label htmlFor="rememberMe" className="text-sm font-normal cursor-default text-gray-500">
+              Sesión persistente (siempre activa)
             </Label>
           </div>
         </CardContent>

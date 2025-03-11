@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
@@ -77,65 +76,16 @@ export const useLoginState = () => {
       
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
-        password
+        password,
+        options: {
+          // Always use persistSession: true to keep the session active
+          // even if the browser is closed or refreshed
+          persistSession: true
+        }
       });
       
       if (error) {
         console.log('Error de autenticación:', error.message);
-        
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('email', email)
-          .single();
-        
-        if (!userError && userData && userData.is_active) {
-          console.log('El usuario existe en la tabla pero no en auth, intentando registrarlo');
-          
-          const { error: signUpError } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              data: {
-                name: userData.name,
-                username: userData.username,
-                role: userData.role,
-                service_ids: userData.service_ids || []
-              }
-            }
-          });
-          
-          if (signUpError) {
-            if (signUpError.message.includes('email rate limit')) {
-              toast({
-                title: "Advertencia de autenticación",
-                description: "Hay un problema temporal con la verificación, pero puede continuar usando el sistema.",
-              });
-              
-              navigate(from, { replace: true });
-              return;
-            }
-            throw signUpError;
-          }
-          
-          const { error: retryError } = await supabase.auth.signInWithPassword({
-            email,
-            password
-          });
-          
-          if (retryError) {
-            throw retryError;
-          }
-          
-          toast({
-            title: "Inicio de sesión exitoso",
-            description: "Bienvenido al sistema",
-          });
-          
-          navigate(from, { replace: true });
-          return;
-        }
-        
         throw error;
       }
       
