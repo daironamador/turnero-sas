@@ -61,7 +61,11 @@ export function useTicketUpdates({
             setNewlyCalledTicket(calledTicket);
             
             // Only announce if this is a new call (not already announced)
-            if (lastAnnounced !== calledTicket.id) {
+            // For recalled tickets, we always want to announce them
+            // Check if this is a recall (previous status was not 'waiting')
+            const isRecall = payload.old.status && payload.old.status !== 'waiting';
+            
+            if (isRecall || lastAnnounced !== calledTicket.id) {
               // Find room name for current counter
               let roomName = `sala ${calledTicket.counterNumber}`;
               if (roomsQuery.data && calledTicket.counterNumber) {
@@ -95,7 +99,11 @@ export function useTicketUpdates({
                 calledTicket.redirectedFrom, 
                 originalRoomName
               );
-              setLastAnnounced(calledTicket.id);
+              
+              // If it's a recall, we don't update lastAnnounced so it will be announced every time
+              if (!isRecall) {
+                setLastAnnounced(calledTicket.id);
+              }
             }
           }
         });
