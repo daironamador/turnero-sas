@@ -1,4 +1,3 @@
-
 export interface Patient {
   id: string;
   firstName: string;
@@ -115,5 +114,19 @@ export interface User {
   isActive: boolean;
   serviceIds: string[];
   services?: Service[];
+  createdAt: Date;
+}
+
+export type NotificationType = 'text' | 'image' | 'youtube';
+
+export interface Notification {
+  id: string;
+  title: string;
+  content: string;
+  type: NotificationType;
+  imageUrl?: string;
+  youtubeUrl?: string;
+  active: boolean;
+  intervalInSeconds: number;
   createdAt: Date;
 }

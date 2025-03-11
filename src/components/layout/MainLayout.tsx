@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Home, Ticket, PhoneCall, LayoutTemplate, BarChart3, Settings } from 'lucide-react';
+import { Home, Ticket, PhoneCall, LayoutTemplate, BarChart3, Settings, Bell } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import ProfileButton from '@/components/auth/ProfileButton';
 import {
@@ -89,6 +89,17 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
               </div>
             </Link>
             <Link 
+              to="/notification" 
+              className={`text-sm font-medium transition-colors hover:text-primary ${
+                location.pathname === '/notification' ? 'text-primary' : 'text-muted-foreground'
+              }`}
+            >
+              <div className="flex items-center gap-1">
+                <Bell className="h-4 w-4" />
+                <span>Notificación</span>
+              </div>
+            </Link>
+            <Link 
               to="/reports" 
               className={`text-sm font-medium transition-colors hover:text-primary ${
                 location.pathname === '/reports' ? 'text-primary' : 'text-muted-foreground'
@@ -147,6 +158,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                 <Link to="/display" className="flex items-center">
                   <LayoutTemplate className="mr-2 h-4 w-4" />
                   <span>Display</span>
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to="/notification" className="flex items-center">
+                  <Bell className="mr-2 h-4 w-4" />
+                  <span>Notificación</span>
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>

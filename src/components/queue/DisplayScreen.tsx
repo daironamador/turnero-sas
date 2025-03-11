@@ -6,6 +6,7 @@ import DisplayFooter from './display/DisplayFooter';
 import TicketNotification from './display/TicketNotification';
 import ServingTicketsSection from './display/ServingTicketsSection';
 import LastCalledSection from './display/LastCalledSection';
+import NotificationCarousel from './display/NotificationCarousel';
 import { useTicketData } from './display/useTicketData';
 import { useTicketUpdates } from './display/useTicketUpdates';
 
@@ -61,6 +62,11 @@ const DisplayScreen: React.FC<DisplayScreenProps> = ({ refreshInterval = 5000 })
           rooms={roomsQuery.data}
           isLoading={waitingTicketsQuery.isLoading} 
         />
+      </div>
+      
+      {/* Notifications Carousel */}
+      <div className="container mx-auto px-6 mb-6">
+        <NotificationCarousel />
       </div>
       
       {/* Footer */}

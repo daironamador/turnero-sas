@@ -21,6 +21,7 @@ import ConfigRooms from "./pages/config/Rooms";
 import ConfigSettings from "./pages/config/Settings";
 import ConfigUsers from "./pages/config/Users";
 import Reports from "./pages/Reports";
+import Notification from "./pages/Notification";
 
 const queryClient = new QueryClient();
 
@@ -87,6 +88,11 @@ const App = () => {
               <Route path="/config/users" element={
                 <ProtectedRoute>
                   <ConfigUsers />
+                </ProtectedRoute>
+              } />
+              <Route path="/notification" element={
+                <ProtectedRoute>
+                  <Notification />
                 </ProtectedRoute>
               } />
               <Route path="*" element={<NotFound />} />
