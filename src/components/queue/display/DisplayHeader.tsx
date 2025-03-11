@@ -35,7 +35,7 @@ const DisplayHeader: React.FC = () => {
   }, []);
 
   return (
-    <div className="bg-ocular-600 text-white p-6">
+    <div className="bg-gray-200 text-gray-800 p-6">
       <div className="container mx-auto flex justify-between items-center">
         <div className="flex items-center gap-4">
           {!loading && settings?.logo && (
