@@ -158,12 +158,12 @@ export const redirectTicket = async (
     throw fetchError;
   }
   
-  // Crear un nuevo número de ticket para el servicio redirigido
-  const newTicketNumber = await generateTicketNumber(targetServiceType);
+  // Instead of creating a new ticket number, we'll preserve the original ticket number
+  const originalTicketNumber = currentTicket.ticket_number;
   
   // Crear el nuevo ticket redirigido
   const newTicket = {
-    ticket_number: newTicketNumber,
+    ticket_number: originalTicketNumber, // Keep original ticket number
     service_type: targetServiceType,
     status: 'waiting',
     is_vip: currentTicket.is_vip,

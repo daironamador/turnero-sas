@@ -35,7 +35,7 @@ const TicketNotification: React.FC<TicketNotificationProps> = ({ ticket, rooms }
     }
   }
 
-  // Use the ticket's original number (which is preserved during redirects)
+  // Use the ticket's original number for display
   const displayNumber = ticket.ticketNumber || '';
 
   return (

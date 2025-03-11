@@ -85,7 +85,7 @@ export function useTicketUpdates({
                 }
               }
               
-              // Use the ticket's original number for the announcement
+              // Use the ticket number for the announcement (it's already the original number now)
               const ticketNumberToAnnounce = calledTicket.ticketNumber;
               
               // Announce the called ticket with redirection info if applicable
