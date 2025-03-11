@@ -1,4 +1,3 @@
-
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
@@ -61,21 +60,23 @@ export function useTicketUpdates({
           
           // Get the correct room name - use provided counterName or find it based on counterNumber
           let roomNameToUse = counterName;
-          if (!roomNameToUse && ticket.counterNumber && roomsQuery.data) {
-            const room = roomsQuery.data.find((r: any) => r.id === ticket.counterNumber);
-            if (room) {
-              roomNameToUse = room.name;
-            }
-          }
           
-          // Announce the ticket
+          // Check if we received a valid counterName from the broadcast
           if (roomNameToUse) {
+            console.log(`Announcing ticket ${ticket.ticketNumber} to room ${roomNameToUse}`);
+            
+            // Announce the ticket with the provided room name
             announceTicket(
               ticket.ticketNumber,
               roomNameToUse,
               redirectedFrom,
               originalRoomName
             );
+            
+            // Keep track of the last announced ticket ID
+            setLastAnnounced(ticket.id);
+          } else {
+            console.error('Missing room name for announcement');
           }
         }
       }
@@ -90,7 +91,6 @@ export function useTicketUpdates({
     roomsQuery.data, 
     announceTicket, 
     setNewlyCalledTicket, 
-    lastAnnounced, 
     setLastAnnounced
   ]);
   

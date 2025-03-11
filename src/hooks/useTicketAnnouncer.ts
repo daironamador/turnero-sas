@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { Room } from '@/lib/types';
+import { Room, Ticket } from '@/lib/types';
 
 export function useTicketAnnouncer() {
   const [ticketChannel, setTicketChannel] = useState<BroadcastChannel | null>(null);
@@ -15,7 +15,7 @@ export function useTicketAnnouncer() {
     };
   }, []);
 
-  const announceTicket = (ticket: any, counterName: string | undefined, rooms: Room[]) => {
+  const announceTicket = (ticket: Ticket, counterName: string | undefined, rooms: Room[]) => {
     if (!counterName || !ticketChannel) return;
     
     // Find the original room name if this is a redirected ticket
@@ -39,7 +39,7 @@ export function useTicketAnnouncer() {
       calledAt: new Date()
     };
     
-    console.log("Broadcasting ticket announcement:", updatedTicket);
+    console.log("Broadcasting ticket announcement:", updatedTicket, "to counter:", counterName);
     
     ticketChannel.postMessage({
       type: 'announce-ticket',

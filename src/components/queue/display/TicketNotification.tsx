@@ -12,6 +12,8 @@ interface TicketNotificationProps {
 const TicketNotification: React.FC<TicketNotificationProps> = ({ ticket, rooms }) => {
   if (!ticket) return null;
 
+  console.log("TicketNotification displaying ticket:", ticket);
+
   // Find room name safely
   let roomName = `sala ${ticket.counterNumber}`;
   if (rooms && ticket.counterNumber) {

@@ -9,6 +9,9 @@ const Display: React.FC = () => {
     document.title = "Sistema de Turnos - Display";
     // This helps identify this is the display page for cross-window communication
     window.name = "ticket-display-screen";
+    
+    // Log that the display page has been loaded and is ready
+    console.log("Display page initialized and ready to receive announcements");
   }, []);
 
   return (
