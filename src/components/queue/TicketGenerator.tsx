@@ -8,30 +8,8 @@ import { Ticket as TicketIcon, Printer, Star } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-
-// Mock database of counter values
-const ticketCounters: Record<ServiceType, number> = {
-  'CG': 0,
-  'RX': 0,
-  'RR': 0,
-  'EX': 0,
-  'OT': 0
-};
-
-// Generate sequential ticket number
-const generateTicketNumber = (serviceType: ServiceType) => {
-  // Increment counter for this service type
-  ticketCounters[serviceType] += 1;
-  // Format with leading zeros (001, 002, etc.)
-  return `${serviceType}${ticketCounters[serviceType].toString().padStart(3, '0')}`;
-};
-
-// Mock save ticket function
-const saveTicket = async (ticket: Ticket): Promise<Ticket> => {
-  // In a real app, this would save to a database
-  console.log('Saving ticket:', ticket);
-  return ticket;
-};
+import { createTicket } from '@/services/ticketService';
+import { printTicket } from '@/utils/printUtils';
 
 interface TicketGeneratorProps {
   onTicketGenerated?: (ticket: Ticket) => void;
@@ -43,33 +21,22 @@ const TicketGenerator: React.FC<TicketGeneratorProps> = ({ onTicketGenerated }) 
   const [isGenerating, setIsGenerating] = useState(false);
   const [isVip, setIsVip] = useState(false);
   
-  const generateTicket = async (serviceType: ServiceType) => {
+  const handleGenerateTicket = async (serviceType: ServiceType) => {
     setIsGenerating(true);
     
     try {
-      const ticketNumber = generateTicketNumber(serviceType);
+      // Create ticket in the database
+      const newTicket = await createTicket(serviceType, isVip);
       
-      const newTicket: Ticket = {
-        id: crypto.randomUUID(),
-        ticketNumber,
-        serviceType,
-        status: 'waiting',
-        isVip,
-        createdAt: new Date(),
-      };
-      
-      // In a real application, save to database
-      const savedTicket = await saveTicket(newTicket);
-      
-      setGeneratedTicket(savedTicket);
+      setGeneratedTicket(newTicket);
       
       if (onTicketGenerated) {
-        onTicketGenerated(savedTicket);
+        onTicketGenerated(newTicket);
       }
       
       toast({
         title: isVip ? "Ticket VIP generado" : "Ticket generado",
-        description: `Ticket ${ticketNumber} para ${ServiceTypeLabels[serviceType]}`,
+        description: `Ticket ${newTicket.ticketNumber} para ${ServiceTypeLabels[serviceType]}`,
       });
       
       // Reset VIP status for next ticket
@@ -89,10 +56,9 @@ const TicketGenerator: React.FC<TicketGeneratorProps> = ({ onTicketGenerated }) 
   const handlePrintTicket = () => {
     if (!generatedTicket) return;
     
-    // In a real application, this would send to printer
-    console.log('Printing ticket:', generatedTicket);
+    // Print using our printing utility
+    printTicket(generatedTicket);
     
-    // Simulate printing with a toast
     toast({
       title: "Imprimiendo ticket",
       description: `Ticket ${generatedTicket.ticketNumber} enviado a la impresora`,
@@ -164,7 +130,7 @@ const TicketGenerator: React.FC<TicketGeneratorProps> = ({ onTicketGenerated }) 
             <Card 
               key={serviceType} 
               className={`hover:shadow-md transition-shadow cursor-pointer hover-scale ${isVip ? 'border-yellow-300' : ''}`}
-              onClick={() => generateTicket(serviceType)}
+              onClick={() => handleGenerateTicket(serviceType)}
             >
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center">

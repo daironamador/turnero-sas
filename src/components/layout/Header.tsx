@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { CalendarDays, Ticket, Home, Settings, Phone } from 'lucide-react';
+import { CalendarDays, Ticket, Home, Settings, Phone, FileText } from 'lucide-react';
 import OcularLogo from '@/components/ui-components/OcularLogo';
 import { cn } from '@/lib/utils';
 
@@ -60,6 +60,19 @@ const Header: React.FC = () => {
           >
             <Phone className="w-4 h-4 mr-2" />
             <span>Llamada</span>
+          </Link>
+          
+          <Link
+            to="/reports"
+            className={cn(
+              "flex items-center text-sm font-medium transition-colors hover:text-ocular-600",
+              isActive('/reports') 
+                ? "text-ocular-700 border-b-2 border-ocular-600" 
+                : "text-muted-foreground"
+            )}
+          >
+            <FileText className="w-4 h-4 mr-2" />
+            <span>Reportes</span>
           </Link>
           
           <Link
