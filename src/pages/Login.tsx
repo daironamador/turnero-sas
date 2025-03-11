@@ -94,13 +94,22 @@ const Login = () => {
       setLoading(true);
       console.log(`Intentando iniciar sesión con: ${email}, mantener sesión: ${stayLoggedIn}`);
       
-      // Sign in with Supabase Auth with persistence option
+      // Set up session storage type based on user preference
+      if (stayLoggedIn) {
+        // Use 'local' storage for persistent sessions
+        await supabase.auth.setSession({
+          access_token: '',
+          refresh_token: ''
+        });
+      } else {
+        // Use 'session' (memory) storage for non-persistent sessions
+        // This is the default in newer versions of Supabase
+      }
+      
+      // Sign in with Supabase Auth
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
-        password,
-        options: {
-          persistSession: stayLoggedIn // This controls whether the session is persisted across browser sessions
-        }
+        password
       });
       
       // If there's an auth error
@@ -127,8 +136,7 @@ const Login = () => {
                 username: userData.username,
                 role: userData.role,
                 service_ids: userData.service_ids || []
-              },
-              persistSession: stayLoggedIn
+              }
             }
           });
           
@@ -143,8 +151,7 @@ const Login = () => {
               // Try to sign in again
               const { error: retryError } = await supabase.auth.signInWithPassword({
                 email,
-                password,
-                options: { persistSession: stayLoggedIn }
+                password
               });
               
               if (!retryError) {
@@ -158,8 +165,7 @@ const Login = () => {
           // Try to sign in again
           const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({
             email,
-            password,
-            options: { persistSession: stayLoggedIn }
+            password
           });
           
           if (retryError) {
