@@ -3,14 +3,13 @@ import React from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { Notification } from '@/lib/types';
+import { Notification, NotificationType } from '@/lib/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
 
 interface NotificationDialogProps {
@@ -24,12 +23,14 @@ interface NotificationDialogProps {
 const notificationSchema = z.object({
   title: z.string().min(1, 'El título es requerido'),
   content: z.string().min(1, 'El contenido es requerido'),
-  type: z.enum(['text', 'image', 'youtube']),
+  type: z.enum(['text', 'image', 'youtube'] as const),
   imageUrl: z.string().optional(),
   youtubeUrl: z.string().optional(),
   active: z.boolean(),
   intervalInSeconds: z.coerce.number().min(1, 'El intervalo debe ser al menos 1 segundo'),
 });
+
+type NotificationFormValues = z.infer<typeof notificationSchema>;
 
 const NotificationDialog: React.FC<NotificationDialogProps> = ({
   open,
@@ -38,7 +39,7 @@ const NotificationDialog: React.FC<NotificationDialogProps> = ({
   onSubmit,
   isSubmitting
 }) => {
-  const form = useForm<z.infer<typeof notificationSchema>>({
+  const form = useForm<NotificationFormValues>({
     resolver: zodResolver(notificationSchema),
     defaultValues: {
       title: notification?.title || '',
@@ -77,8 +78,8 @@ const NotificationDialog: React.FC<NotificationDialogProps> = ({
   
   const watchType = form.watch('type');
   
-  const handleSubmit = (values: z.infer<typeof notificationSchema>) => {
-    onSubmit(values);
+  const handleSubmit = (values: NotificationFormValues) => {
+    onSubmit(values as Omit<Notification, 'id' | 'createdAt'>);
   };
   
   return (
@@ -192,7 +193,7 @@ const NotificationDialog: React.FC<NotificationDialogProps> = ({
               />
             )}
             
-            {(watchType === 'youtube' || watchType === 'text') && (
+            {(watchType === 'youtube' || watchType === 'image') && (
               <FormField
                 control={form.control}
                 name="content"

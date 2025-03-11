@@ -1,6 +1,5 @@
 
 import React from 'react';
-import { Bell } from 'lucide-react';
 import DisplayHeader from './display/DisplayHeader';
 import DisplayFooter from './display/DisplayFooter';
 import TicketNotification from './display/TicketNotification';

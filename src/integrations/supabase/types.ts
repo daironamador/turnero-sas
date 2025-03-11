@@ -42,6 +42,42 @@ export type Database = {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          active: boolean
+          content: string
+          created_at: string
+          id: string
+          image_url: string | null
+          interval_in_seconds: number
+          title: string
+          type: string
+          youtube_url: string | null
+        }
+        Insert: {
+          active?: boolean
+          content: string
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          interval_in_seconds?: number
+          title: string
+          type: string
+          youtube_url?: string | null
+        }
+        Update: {
+          active?: boolean
+          content?: string
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          interval_in_seconds?: number
+          title?: string
+          type?: string
+          youtube_url?: string | null
+        }
+        Relationships: []
+      }
       rooms: {
         Row: {
           created_at: string

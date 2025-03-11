@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { Notification } from '@/lib/types';
+import { Notification, NotificationType } from '@/lib/types';
 
 export const getNotifications = async (): Promise<Notification[]> => {
   const { data, error } = await supabase
@@ -17,7 +17,7 @@ export const getNotifications = async (): Promise<Notification[]> => {
     id: notification.id,
     title: notification.title,
     content: notification.content,
-    type: notification.type,
+    type: notification.type as NotificationType,
     imageUrl: notification.image_url,
     youtubeUrl: notification.youtube_url,
     active: notification.active,
@@ -42,7 +42,7 @@ export const getActiveNotifications = async (): Promise<Notification[]> => {
     id: notification.id,
     title: notification.title,
     content: notification.content,
-    type: notification.type,
+    type: notification.type as NotificationType,
     imageUrl: notification.image_url,
     youtubeUrl: notification.youtube_url,
     active: notification.active,
@@ -77,7 +77,7 @@ export const createNotification = async (notification: Omit<Notification, 'id' |
     id: data.id,
     title: data.title,
     content: data.content,
-    type: data.type,
+    type: data.type as NotificationType,
     imageUrl: data.image_url,
     youtubeUrl: data.youtube_url,
     active: data.active,
