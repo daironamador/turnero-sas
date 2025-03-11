@@ -108,7 +108,7 @@ export type Database = {
         Row: {
           called_at: string | null
           completed_at: string | null
-          counter_number: number | null
+          counter_number: string | null
           created_at: string
           id: string
           is_vip: boolean
@@ -123,7 +123,7 @@ export type Database = {
         Insert: {
           called_at?: string | null
           completed_at?: string | null
-          counter_number?: number | null
+          counter_number?: string | null
           created_at?: string
           id?: string
           is_vip?: boolean
@@ -138,7 +138,7 @@ export type Database = {
         Update: {
           called_at?: string | null
           completed_at?: string | null
-          counter_number?: number | null
+          counter_number?: string | null
           created_at?: string
           id?: string
           is_vip?: boolean
