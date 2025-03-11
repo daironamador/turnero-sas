@@ -48,9 +48,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsPersistent(isPersistent);
     
     // Update session persistence setting in Supabase
+    // Using the correct method for this version of Supabase client
     if (session) {
-      // Apply persistence setting to current session
-      supabase.auth.updateSession({
+      // Instead of using updateSession, we'll set the session with the same token
+      // This effectively refreshes the session with current settings
+      supabase.auth.setSession({
+        access_token: session.access_token,
         refresh_token: session.refresh_token,
       });
     }
