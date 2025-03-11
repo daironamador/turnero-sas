@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { toast } from 'sonner';
 import { useMutation } from "@tanstack/react-query";
@@ -167,7 +168,7 @@ const TicketManager: React.FC<TicketManagerProps> = ({
     );
     
     // Dispatch a custom event that the Display page can listen for
-    const recallEvent = new CustomEvent('ticket-recalled', {
+    const customEvent = new CustomEvent('ticket-recalled', {
       detail: {
         ticketNumber: currentTicket.ticketNumber,
         counterName: counterName,
@@ -175,13 +176,60 @@ const TicketManager: React.FC<TicketManagerProps> = ({
         originalRoomName: originalRoomName
       }
     });
-    window.dispatchEvent(recallEvent);
+    
+    // Dispatch the event to make it available globally
+    window.dispatchEvent(customEvent);
     
     toast.success(`Volviendo a llamar al ticket ${currentTicket.ticketNumber}`);
   };
 
   const handleRecallFromHistory = (ticket: Ticket) => {
-    recallTicketMutation.mutate({ ticket });
+    if (!counterName) {
+      toast.error("No se puede rellamar sin un nombre de sala");
+      return;
+    }
+
+    // First recall the ticket through the mutation
+    recallTicketMutation.mutate({ 
+      ticket 
+    }, {
+      onSuccess: () => {
+        // Find the original room name if this is a redirected ticket
+        let originalRoomName: string | undefined;
+        if (ticket.redirectedFrom) {
+          // Try to find the room with the matching service
+          const possibleRooms = rooms.filter(
+            r => r.service?.code === ticket.redirectedFrom
+          );
+          if (possibleRooms.length > 0) {
+            originalRoomName = possibleRooms[0].name;
+          } else {
+            originalRoomName = `servicio ${ticket.redirectedFrom}`;
+          }
+        }
+        
+        // Announce the ticket
+        announceTicket(
+          ticket.ticketNumber, 
+          counterName, 
+          ticket.redirectedFrom, 
+          originalRoomName
+        );
+        
+        // Dispatch a custom event for the display
+        const customEvent = new CustomEvent('ticket-recalled', {
+          detail: {
+            ticketNumber: ticket.ticketNumber,
+            counterName: counterName,
+            redirectedFrom: ticket.redirectedFrom,
+            originalRoomName: originalRoomName
+          }
+        });
+        
+        // Dispatch the event to make it available globally
+        window.dispatchEvent(customEvent);
+      }
+    });
   };
 
   return (

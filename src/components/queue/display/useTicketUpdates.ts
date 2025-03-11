@@ -114,6 +114,24 @@ export function useTicketUpdates({
     const handleTicketRecalled = (event: CustomEvent) => {
       const { ticketNumber, counterName, redirectedFrom, originalRoomName } = event.detail;
       
+      // Show notification
+      if (roomsQuery.data) {
+        // Create a notification ticket for display
+        const notificationTicket = {
+          id: `recall-${Date.now()}`,
+          ticketNumber: ticketNumber,
+          counterNumber: roomsQuery.data.find((r: any) => r.name === counterName)?.id || "",
+          status: 'serving',
+          serviceType: '',
+          isVip: false,
+          createdAt: new Date(),
+          calledAt: new Date(),
+          redirectedFrom: redirectedFrom
+        } as Ticket;
+        
+        setNewlyCalledTicket(notificationTicket);
+      }
+      
       // Announce the recalled ticket
       announceTicket(
         ticketNumber,
