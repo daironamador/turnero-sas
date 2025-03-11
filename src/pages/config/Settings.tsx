@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import MainLayout from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
@@ -11,53 +11,102 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-// Mock data
-const mockSettings: CompanySettings = {
-  id: '1',
-  name: 'OcularClinic',
-  address: 'Av. Principal #123, Ciudad',
-  phone: '(123) 456-7890',
-  email: 'contacto@ocularclinic.com',
-  logo: '',
-  ticketFooter: 'Gracias por su visita. Por favor conserve este ticket.',
-  displayMessage: 'Bienvenido a OcularClinic. Por favor espere a ser llamado.',
-};
+import { getCompanySettings, saveCompanySettings } from '@/services/settingsService';
 
 const Settings: React.FC = () => {
   const { toast } = useToast();
-  const [settings, setSettings] = useState<CompanySettings>(mockSettings);
-  const [isLoading, setIsLoading] = useState(false);
+  const [settings, setSettings] = useState<CompanySettings | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const data = await getCompanySettings();
+        setSettings(data);
+      } catch (error) {
+        console.error('Error al cargar la configuración:', error);
+        toast({
+          title: "Error",
+          description: "No se pudo cargar la configuración",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadSettings();
+  }, [toast]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    if (!settings) return;
+    
     const { name, value } = e.target;
-    setSettings(prev => ({ ...prev, [name]: value }));
+    setSettings(prev => prev ? ({ ...prev, [name]: value }) : null);
   };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!settings) return;
+    
     const file = e.target.files?.[0];
     if (file) {
       // In a real app, you would upload this to a server
       // Here we're just creating a data URL for preview
       const reader = new FileReader();
       reader.onload = () => {
-        setSettings(prev => ({ ...prev, logo: reader.result as string }));
+        setSettings(prev => prev ? ({ ...prev, logo: reader.result as string }) : null);
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const handleSaveSettings = () => {
-    setIsLoading(true);
-    // In a real app, you would save this to your backend
-    setTimeout(() => {
-      setIsLoading(false);
+  const handleSaveSettings = async () => {
+    if (!settings) return;
+    
+    setIsSaving(true);
+    try {
+      await saveCompanySettings(settings);
       toast({
         title: "Configuración guardada",
         description: "Los cambios han sido guardados exitosamente",
       });
-    }, 1000);
+    } catch (error) {
+      console.error('Error al guardar la configuración:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo guardar la configuración",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
+
+  if (isLoading) {
+    return (
+      <MainLayout>
+        <div className="h-screen flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 border-t-ocular-600 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin mx-auto"></div>
+            <p className="mt-4 text-lg">Cargando configuración...</p>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  if (!settings) {
+    return (
+      <MainLayout>
+        <div className="text-center p-8">
+          <h2 className="text-2xl font-bold mb-4">Error al cargar la configuración</h2>
+          <p className="mb-4">No se pudo cargar la configuración de la empresa.</p>
+          <Button onClick={() => window.location.reload()}>Intentar nuevamente</Button>
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
@@ -80,10 +129,10 @@ const Settings: React.FC = () => {
           <Button 
             onClick={handleSaveSettings}
             className="bg-ocular-600 hover:bg-ocular-700"
-            disabled={isLoading}
+            disabled={isSaving}
           >
             <Save className="mr-2 h-4 w-4" /> 
-            {isLoading ? 'Guardando...' : 'Guardar Cambios'}
+            {isSaving ? 'Guardando...' : 'Guardar Cambios'}
           </Button>
         </div>
         
@@ -193,7 +242,7 @@ const Settings: React.FC = () => {
                           variant="outline" 
                           size="sm"
                           className="w-full text-red-500 hover:text-red-600 hover:bg-red-50"
-                          onClick={() => setSettings(prev => ({ ...prev, logo: '' }))}
+                          onClick={() => setSettings(prev => prev ? ({ ...prev, logo: '' }) : null)}
                         >
                           Eliminar Logo
                         </Button>
