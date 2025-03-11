@@ -205,7 +205,7 @@ const ReportsTable: React.FC<ReportsTableProps> = ({ tickets, startDate, endDate
                 </TableCell>
                 <TableCell>
                   {waitTimeMinutes !== null 
-                    ? `${waitTimeMinutes} min`
+                    ? `${waitTimeMinutes.toString()} min`
                     : '-'}
                 </TableCell>
                 <TableCell>

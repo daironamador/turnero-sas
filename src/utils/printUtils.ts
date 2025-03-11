@@ -394,7 +394,7 @@ export const printReport = async (
                 <td>${ticket.isVip ? 'Sí' : 'No'}</td>
                 <td>${ticket.patientName || '-'}</td>
                 <td>${format(ticket.createdAt, 'dd/MM/yyyy HH:mm')}</td>
-                <td>${typeof waitTime === 'number' ? `${waitTime} min` : waitTime}</td>
+                <td>${typeof waitTime === 'number' ? `${waitTime.toString()} min` : waitTime}</td>
                 <td>${getRoomDisplay(ticket.counterNumber)}</td>
               </tr>
             `;
