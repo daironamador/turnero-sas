@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useSpeechSynthesis } from './useSpeechSynthesis';
-import { Ticket } from '@/lib/types';
+import { Ticket, ServiceType } from '@/lib/types';
 
 interface UseTicketUpdatesProps {
   roomsQuery: any;
@@ -117,12 +117,13 @@ export function useTicketUpdates({
       // Show notification
       if (roomsQuery.data) {
         // Create a notification ticket for display
+        // Use a valid ServiceType (OT - Otros Servicios) instead of an empty string
         const notificationTicket = {
           id: `recall-${Date.now()}`,
           ticketNumber: ticketNumber,
           counterNumber: roomsQuery.data.find((r: any) => r.name === counterName)?.id || "",
           status: 'serving',
-          serviceType: '',
+          serviceType: 'OT' as ServiceType, // Use a valid ServiceType
           isVip: false,
           createdAt: new Date(),
           calledAt: new Date(),
