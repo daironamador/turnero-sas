@@ -43,12 +43,14 @@ export const generateTicketNumber = async (serviceType: ServiceType): Promise<st
   // Obtener tickets de hoy para este tipo de servicio para encontrar el número más alto
   const today = new Date();
   const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
+  const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).toISOString();
 
   const { data, error } = await supabase
     .from('tickets')
     .select('ticket_number')
     .eq('service_type', serviceType)
     .gte('created_at', startOfDay)
+    .lt('created_at', endOfDay)
     .order('ticket_number', { ascending: false })
     .limit(1);
 
