@@ -31,6 +31,26 @@ const CurrentTicket: React.FC<CurrentTicketProps> = ({
 }) => {
   const isVip = currentTicket?.isVip;
   
+  // Function to announce ticket via broadcast channel
+  const handleCallAgain = () => {
+    if (currentTicket && onCallAgain) {
+      // Create a broadcast channel to send announcement to display page
+      const ticketChannel = new BroadcastChannel('ticket-announcements');
+      
+      // Send the ticket data to the display page
+      ticketChannel.postMessage({
+        type: 'announce-ticket',
+        ticket: currentTicket
+      });
+      
+      // Close the channel after sending the message
+      setTimeout(() => ticketChannel.close(), 500);
+      
+      // Call the original onCallAgain function
+      onCallAgain();
+    }
+  };
+  
   return (
     <Card className={`bg-white border ${
       isVip 
@@ -99,7 +119,7 @@ const CurrentTicket: React.FC<CurrentTicketProps> = ({
               <Button 
                 variant="secondary" 
                 size="sm"
-                onClick={onCallAgain}
+                onClick={handleCallAgain}
                 className="mr-auto"
               >
                 Volver a Llamar

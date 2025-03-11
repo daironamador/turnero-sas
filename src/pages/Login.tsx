@@ -81,11 +81,7 @@ const Login = () => {
       // Sign in with Supabase Auth (prioritize Auth)
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
-        password,
-        options: {
-          // Set persistence based on the remember me checkbox
-          persistSession: true // Always persist within the browser session
-        }
+        password
       });
       
       // Apply the remember me setting to control persistence beyond browser session
@@ -140,10 +136,7 @@ const Login = () => {
           // Try to sign in again
           const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({
             email,
-            password,
-            options: {
-              persistSession: true
-            }
+            password
           });
           
           if (retryError) {
