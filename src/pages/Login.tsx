@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -31,7 +32,7 @@ const Login = () => {
   // Redirect if user is already logged in
   useEffect(() => {
     if (user) {
-      navigate(from);
+      navigate(from, { replace: true });
     }
   }, [user, navigate, from]);
 
@@ -79,9 +80,10 @@ const Login = () => {
       // Ensure session is properly set before navigating
       if (data.session) {
         setSession(data.session);
+        // Use replace: true to prevent back button from returning to login page
+        navigate(from, { replace: true });
       }
       
-      navigate(from);
     } catch (error: any) {
       console.error('Login error:', error);
       setError(error.message || 'Error al iniciar sesión');

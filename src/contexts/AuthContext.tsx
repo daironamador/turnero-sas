@@ -29,7 +29,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Reduce refresh frequency by increasing minimum time between refreshes to 10 seconds
     const now = Date.now();
     if (now - lastRefreshTime < 10000) {
-      // Don't log every time to reduce console spam
       return;
     }
     
@@ -50,16 +49,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
       
-      setSession(newSession);
-      setUser(newSession?.user ?? null);
-      
-      // Set user role from metadata
-      if (newSession?.user) {
-        setUserRole(newSession.user.user_metadata?.role || 'viewer');
-        console.log('Session refreshed successfully:', newSession.user.email, 'with role:', newSession.user.user_metadata?.role || 'viewer');
+      if (newSession) {
+        setSession(newSession);
+        setUser(newSession.user ?? null);
+        
+        // Set user role from metadata
+        if (newSession.user) {
+          setUserRole(newSession.user.user_metadata?.role || 'viewer');
+          console.log('Session refreshed successfully:', newSession.user.email, 'with role:', newSession.user.user_metadata?.role || 'viewer');
+        } 
       } else {
         console.log('No session found during refresh');
-        setUserRole('viewer');
       }
       
     } catch (error) {
@@ -149,7 +149,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.error('Error during session check:', error);
         }
       }
-    }, 30 * 60 * 1000); // Check every 30 minutes instead of 15
+    }, 30 * 60 * 1000); // Check every 30 minutes 
 
     return () => {
       subscription.unsubscribe();
