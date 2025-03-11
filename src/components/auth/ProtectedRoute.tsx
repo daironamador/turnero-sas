@@ -22,15 +22,15 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   useEffect(() => {
     const checkAndRefreshSession = async () => {
       if (!user && !refreshAttempted && !loading) {
-        console.log('No user found, attempting to refresh session');
+        console.log('No user found, attempting to refresh session once');
         setIsRefreshing(true);
         try {
           await refreshUser();
+          setRefreshAttempted(true);
         } catch (error) {
           console.error('Error refreshing user session:', error);
         } finally {
           setIsRefreshing(false);
-          setRefreshAttempted(true);
         }
       }
     };

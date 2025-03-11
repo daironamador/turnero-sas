@@ -63,16 +63,6 @@ const Login = () => {
       setLoading(true);
       console.log(`Intentando iniciar sesión con: ${email}, mantener sesión: ${stayLoggedIn}`);
       
-      // Set up session storage type based on user preference
-      if (!stayLoggedIn) {
-        // Use 'memory' storage for non-persistent sessions
-        supabase.auth.setAuth({ persistSession: false });
-        console.log('Using memory storage for session (will not persist)');
-      } else {
-        // Use 'local' storage for persistent sessions
-        console.log('Using local storage for session (will persist)');
-      }
-      
       // Sign in with Supabase Auth
       const { data, error } = await supabase.auth.signInWithPassword({
         email,

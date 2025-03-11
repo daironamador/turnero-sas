@@ -22,8 +22,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string>('viewer');
   const [refreshCount, setRefreshCount] = useState(0);
+  const [lastRefreshTime, setLastRefreshTime] = useState(0);
 
   const refreshUser = async () => {
+    // Prevent too frequent refreshes (minimum 2 seconds between refreshes)
+    const now = Date.now();
+    if (now - lastRefreshTime < 2000) {
+      console.log('Skipping refresh - too soon since last refresh');
+      return;
+    }
+    
+    setLastRefreshTime(now);
+    
     try {
       console.log('Refreshing user session...');
       const { data: { session: newSession }, error } = await supabase.auth.getSession();
@@ -54,13 +64,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
+    let isInitialLoad = true;
+    
     const getSession = async () => {
+      if (!isInitialLoad) return; // Only run during initial load
+      
       setLoading(true);
       try {
         await refreshUser();
       } catch (error) {
         console.error('Error getting session:', error);
+      } finally {
         setLoading(false);
+        isInitialLoad = false;
       }
     };
 
