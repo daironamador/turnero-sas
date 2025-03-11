@@ -39,7 +39,7 @@ const Llamada: React.FC = () => {
     <MainLayout>
       <LlamadaPageHeader />
       
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
+      <div className="bg-white rounded-lg shadow-lg overflow-hidden border border-slate-200">
         {selectedRoom && roomsQuery.data && (
           <RoomTabs
             rooms={roomsQuery.data}

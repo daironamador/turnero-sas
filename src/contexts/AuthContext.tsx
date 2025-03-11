@@ -9,6 +9,7 @@ type AuthContextType = {
   loading: boolean;
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  userRole: string;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -17,12 +18,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [userRole, setUserRole] = useState<string>('viewer');
 
   const refreshUser = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
       setUser(session?.user ?? null);
+      
+      // Set user role from metadata
+      if (session?.user) {
+        setUserRole(session.user.user_metadata?.role || 'viewer');
+      }
     } catch (error) {
       console.error('Error getting session:', error);
     }
@@ -46,6 +53,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       (_event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
+        
+        // Update user role when auth state changes
+        if (session?.user) {
+          setUserRole(session.user.user_metadata?.role || 'viewer');
+        } else {
+          setUserRole('viewer');
+        }
+        
         setLoading(false);
       }
     );
@@ -64,7 +79,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     user,
     loading,
     signOut,
-    refreshUser
+    refreshUser,
+    userRole
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

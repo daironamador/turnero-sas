@@ -1,244 +1,324 @@
 
 import React, { useState } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
+import * as z from 'zod';
 import { User, Service } from '@/lib/types';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Checkbox } from '@/components/ui/checkbox';
+import { AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+
+// Form validation schema
+const formSchema = z.object({
+  name: z.string().min(2, { message: 'El nombre debe tener al menos 2 caracteres' }),
+  username: z.string().min(3, { message: 'El nombre de usuario debe tener al menos 3 caracteres' }),
+  email: z.string().email({ message: 'Correo electrónico inválido' }),
+  role: z.enum(['admin', 'operator', 'viewer'], {
+    required_error: 'Debe seleccionar un rol',
+  }),
+  password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres' }).optional(),
+  confirmPassword: z.string().optional(),
+  isActive: z.boolean().default(true),
+  serviceIds: z.array(z.string()).optional(),
+}).refine(data => {
+  // When creating a new user, password is required
+  if (!data.password && !data.confirmPassword) return true;
+  return data.password === data.confirmPassword;
+}, {
+  message: "Las contraseñas no coinciden",
+  path: ["confirmPassword"],
+});
 
 interface UserFormProps {
   user?: User;
   services: Service[];
-  onSave: (user: Partial<User>, password?: string) => void;
+  onSave: (data: Partial<User>, password?: string) => void;
   onCancel: () => void;
-  isCreating: boolean;
+  isCreating?: boolean;
 }
 
-const UserForm: React.FC<UserFormProps> = ({ user, services, onSave, onCancel, isCreating }) => {
-  const [formData, setFormData] = useState<Partial<User>>(
-    user || {
-      username: '',
-      name: '',
-      email: '',
-      role: 'operator',
-      isActive: true,
-      serviceIds: []
-    }
-  );
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [passwordError, setPasswordError] = useState<string | null>(null);
+const UserForm: React.FC<UserFormProps> = ({ 
+  user, 
+  services, 
+  onSave, 
+  onCancel,
+  isCreating = false
+}) => {
+  const [error, setError] = useState<string | null>(null);
+  
+  // Initialize form with user data or defaults
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: user?.name || '',
+      username: user?.username || '',
+      email: user?.email || '',
+      role: (user?.role as 'admin' | 'operator' | 'viewer') || 'operator',
+      password: '',
+      confirmPassword: '',
+      isActive: user?.isActive !== undefined ? user.isActive : true,
+      serviceIds: user?.serviceIds || [],
+    },
+  });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const validatePasswords = () => {
-    if (isCreating) {
-      if (!password) {
-        setPasswordError('La contraseña es obligatoria');
-        return false;
-      }
-      if (password.length < 6) {
-        setPasswordError('La contraseña debe tener al menos 6 caracteres');
-        return false;
-      }
-      if (password !== confirmPassword) {
-        setPasswordError('Las contraseñas no coinciden');
-        return false;
-      }
-    }
-    setPasswordError(null);
-    return true;
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!validatePasswords()) {
-      return;
-    }
-    
-    onSave(formData, isCreating ? password : undefined);
-  };
-
-  const toggleService = (serviceId: string) => {
-    setFormData(prev => {
-      const currentServiceIds = prev.serviceIds || [];
-      const newServiceIds = currentServiceIds.includes(serviceId)
-        ? currentServiceIds.filter(id => id !== serviceId)
-        : [...currentServiceIds, serviceId];
+  const handleSubmit = async (values: z.infer<typeof formSchema>) => {
+    try {
+      setError(null);
       
-      return {
-        ...prev,
-        serviceIds: newServiceIds
+      // For new users, validate password
+      if (isCreating && (!values.password || values.password.length < 6)) {
+        setError('Se requiere una contraseña de al menos 6 caracteres');
+        return;
+      }
+
+      // If passwords are present but don't match
+      if (values.password && values.confirmPassword && values.password !== values.confirmPassword) {
+        setError('Las contraseñas no coinciden');
+        return;
+      }
+      
+      const userData: Partial<User> = {
+        name: values.name,
+        username: values.username,
+        email: values.email,
+        role: values.role,
+        isActive: values.isActive,
+        serviceIds: values.serviceIds || [],
       };
-    });
+      
+      onSave(userData, values.password);
+    } catch (err: any) {
+      setError(err.message || 'Error al guardar usuario');
+    }
+  };
+
+  const roleDescriptions = {
+    admin: 'Acceso completo a todas las funciones del sistema',
+    operator: 'Puede atender tickets y ver reportes',
+    viewer: 'Solo puede ver reportes y pantallas de visualización'
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="username">Nombre de Usuario</Label>
-          <Input
-            id="username"
-            name="username"
-            value={formData.username}
-            onChange={handleChange}
-            required
-            placeholder="Ej: jperez"
-          />
-        </div>
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
         
-        <div className="space-y-2">
-          <Label htmlFor="name">Nombre Completo</Label>
-          <Input
-            id="name"
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-            required
-            placeholder="Ej: Juan Pérez"
-          />
-        </div>
-      </div>
-      
-      <div className="space-y-2">
-        <Label htmlFor="email">Correo Electrónico</Label>
-        <Input
-          id="email"
+        <FormField
+          control={form.control}
+          name="name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Nombre Completo</FormLabel>
+              <FormControl>
+                <Input {...field} placeholder="Nombre del usuario" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        
+        <FormField
+          control={form.control}
+          name="username"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Nombre de Usuario</FormLabel>
+              <FormControl>
+                <Input {...field} placeholder="Nombre único para iniciar sesión" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        
+        <FormField
+          control={form.control}
           name="email"
-          type="email"
-          value={formData.email}
-          onChange={handleChange}
-          required
-          placeholder="correo@ejemplo.com"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Correo Electrónico</FormLabel>
+              <FormControl>
+                <Input {...field} type="email" placeholder="correo@ejemplo.com" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
         />
-      </div>
-      
-      {isCreating && (
-        <>
-          <div className="space-y-2">
-            <Label htmlFor="password">Contraseña</Label>
-            <Input
-              id="password"
+
+        <FormField
+          control={form.control}
+          name="role"
+          render={({ field }) => (
+            <FormItem className="space-y-3">
+              <FormLabel>Rol de Usuario</FormLabel>
+              <FormControl>
+                <RadioGroup
+                  onValueChange={field.onChange}
+                  defaultValue={field.value}
+                  className="flex flex-col space-y-2"
+                >
+                  {(['admin', 'operator', 'viewer'] as const).map(role => (
+                    <div key={role} className="flex items-start space-x-2 border p-3 rounded-md">
+                      <RadioGroupItem value={role} id={`role-${role}`} />
+                      <div className="grid gap-1">
+                        <label
+                          htmlFor={`role-${role}`}
+                          className="font-medium leading-none capitalize"
+                        >
+                          {role === 'admin' ? 'Administrador' : 
+                           role === 'operator' ? 'Operador' : 'Visualizador'}
+                        </label>
+                        <p className="text-xs text-muted-foreground">
+                          {roleDescriptions[role]}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </RadioGroup>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        
+        {isCreating && (
+          <>
+            <FormField
+              control={form.control}
               name="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required={isCreating}
-              placeholder="Contraseña (mínimo 6 caracteres)"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Contraseña</FormLabel>
+                  <FormControl>
+                    <Input 
+                      {...field} 
+                      type="password" 
+                      placeholder="Mínimo 6 caracteres" 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="confirmPassword">Confirmar Contraseña</Label>
-            <Input
-              id="confirmPassword"
-              name="confirmPassword"
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required={isCreating}
-              placeholder="Repita la contraseña"
-            />
-          </div>
-          
-          {passwordError && (
-            <Alert variant="destructive">
-              <AlertDescription>{passwordError}</AlertDescription>
-            </Alert>
-          )}
-        </>
-      )}
-      
-      <div className="space-y-2">
-        <Label htmlFor="role">Rol</Label>
-        <Select
-          value={formData.role}
-          onValueChange={(value: 'admin' | 'operator' | 'viewer') => 
-            setFormData(prev => ({ ...prev, role: value }))
-          }
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Seleccionar rol" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="admin">Administrador</SelectItem>
-            <SelectItem value="operator">Operador</SelectItem>
-            <SelectItem value="viewer">Visualizador</SelectItem>
-          </SelectContent>
-        </Select>
-        <p className="text-xs text-muted-foreground">
-          Los administradores tienen acceso a todas las funciones, los operadores pueden gestionar tickets, y los visualizadores solo pueden ver información.
-        </p>
-      </div>
-      
-      <div className="space-y-2">
-        <Label>Servicios Asignados</Label>
-        <div className="border rounded-md p-4">
-          {services
-            .filter(service => service.isActive)
-            .map(service => (
-              <div key={service.id} className="flex items-center space-x-2 py-1">
-                <Checkbox
-                  id={`service-${service.id}`}
-                  checked={(formData.serviceIds || []).includes(service.id)}
-                  onCheckedChange={() => toggleService(service.id)}
-                />
-                <Label htmlFor={`service-${service.id}`} className="cursor-pointer">
-                  {service.name} ({service.code})
-                </Label>
-              </div>
-            ))}
             
-          {services.filter(service => service.isActive).length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              No hay servicios activos disponibles
-            </p>
+            <FormField
+              control={form.control}
+              name="confirmPassword"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Confirmar Contraseña</FormLabel>
+                  <FormControl>
+                    <Input 
+                      {...field} 
+                      type="password" 
+                      placeholder="Repita la contraseña" 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </>
+        )}
+        
+        <FormField
+          control={form.control}
+          name="isActive"
+          render={({ field }) => (
+            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+              <FormControl>
+                <Checkbox
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              </FormControl>
+              <div className="space-y-1 leading-none">
+                <FormLabel>Usuario Activo</FormLabel>
+                <p className="text-sm text-muted-foreground">
+                  Solo los usuarios activos pueden iniciar sesión y usar el sistema
+                </p>
+              </div>
+            </FormItem>
           )}
-        </div>
-      </div>
-      
-      <div className="flex items-center space-x-2">
-        <Switch
-          id="isActive"
-          checked={formData.isActive}
-          onCheckedChange={(checked) => 
-            setFormData(prev => ({ ...prev, isActive: checked }))
-          }
         />
-        <Label htmlFor="isActive">Usuario Activo</Label>
-      </div>
-      
-      <DialogFooter>
-        <Button type="button" variant="outline" onClick={onCancel}>
-          Cancelar
-        </Button>
-        <Button type="submit">
-          {user ? 'Actualizar Usuario' : 'Crear Usuario'}
-        </Button>
-      </DialogFooter>
-    </form>
+        
+        {(form.watch('role') === 'operator') && (
+          <FormField
+            control={form.control}
+            name="serviceIds"
+            render={() => (
+              <FormItem>
+                <div className="mb-2">
+                  <FormLabel className="text-base">Servicios Asignados</FormLabel>
+                  <p className="text-sm text-muted-foreground">
+                    Seleccione los servicios que este operador podrá atender
+                  </p>
+                </div>
+                {services.map((service) => (
+                  <FormField
+                    key={service.id}
+                    control={form.control}
+                    name="serviceIds"
+                    render={({ field }) => {
+                      return (
+                        <FormItem
+                          key={service.id}
+                          className="flex flex-row items-start space-x-3 space-y-0"
+                        >
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value?.includes(service.id)}
+                              onCheckedChange={(checked) => {
+                                return checked
+                                  ? field.onChange([...field.value || [], service.id])
+                                  : field.onChange(
+                                      field.value?.filter(
+                                        (value) => value !== service.id
+                                      )
+                                    );
+                              }}
+                            />
+                          </FormControl>
+                          <FormLabel className="font-normal">
+                            {service.name}
+                          </FormLabel>
+                        </FormItem>
+                      );
+                    }}
+                  />
+                ))}
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
+        
+        <div className="flex justify-end space-x-2 pt-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+          >
+            Cancelar
+          </Button>
+          <Button 
+            type="submit"
+            className="bg-ocular-600 hover:bg-ocular-700"
+          >
+            {isCreating ? 'Crear Usuario' : 'Guardar Cambios'}
+          </Button>
+        </div>
+      </form>
+    </Form>
   );
 };
 

@@ -51,47 +51,47 @@ const App = () => {
                 </ProtectedRoute>
               } />
               <Route path="/tickets" element={
-                <ProtectedRoute>
+                <ProtectedRoute allowedRoles={['admin', 'operator']}>
                   <Tickets />
                 </ProtectedRoute>
               } />
               <Route path="/llamada" element={
-                <ProtectedRoute>
+                <ProtectedRoute allowedRoles={['admin', 'operator']}>
                   <Llamada />
                 </ProtectedRoute>
               } />
               <Route path="/reports" element={
-                <ProtectedRoute>
+                <ProtectedRoute allowedRoles={['admin', 'operator', 'viewer']}>
                   <Reports />
                 </ProtectedRoute>
               } />
               <Route path="/config" element={
-                <ProtectedRoute>
+                <ProtectedRoute allowedRoles={['admin']}>
                   <Config />
                 </ProtectedRoute>
               } />
               <Route path="/config/services" element={
-                <ProtectedRoute>
+                <ProtectedRoute allowedRoles={['admin']}>
                   <ConfigServices />
                 </ProtectedRoute>
               } />
               <Route path="/config/rooms" element={
-                <ProtectedRoute>
+                <ProtectedRoute allowedRoles={['admin']}>
                   <ConfigRooms />
                 </ProtectedRoute>
               } />
               <Route path="/config/settings" element={
-                <ProtectedRoute>
+                <ProtectedRoute allowedRoles={['admin']}>
                   <ConfigSettings />
                 </ProtectedRoute>
               } />
               <Route path="/config/users" element={
-                <ProtectedRoute>
+                <ProtectedRoute allowedRoles={['admin']}>
                   <ConfigUsers />
                 </ProtectedRoute>
               } />
               <Route path="/notification" element={
-                <ProtectedRoute>
+                <ProtectedRoute allowedRoles={['admin']}>
                   <Notification />
                 </ProtectedRoute>
               } />
