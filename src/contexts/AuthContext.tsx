@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
@@ -205,8 +206,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Error signing out:', error);
       toast('Error al cerrar sesión', {
         description: 'Hubo un problema al cerrar tu sesión.',
-        position: 'top-center',
-        variant: 'destructive'
+        position: 'top-center'
       });
     }
   };

@@ -1,18 +1,10 @@
-
-import { createClient } from '@supabase/supabase-js';
+import { initSupabase } from './supabaseInit';
 import { User, AuthError } from '@supabase/supabase-js';
 
-// Asegurarnos que las credenciales estén definidas correctamente
-const supabaseUrl = 'https://ymiohanwjypzkhjrtqlf.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InltaW9oYW53anlwemtoanJ0cWxmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE1NzQ4MTksImV4cCI6MjA1NzE1MDgxOX0.ELDyIr-4-YPmciAtSAguD7HmdW31SgSkGchLpeIHqFI';
+// Initialize Supabase with cookie-based auth
+export const supabase = initSupabase();
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Faltan credenciales de Supabase. Por favor revise sus variables de entorno.');
-}
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-// Función para crear un nuevo usuario
+// Function to create a new user
 export const createUser = async (email: string, password: string, userData: any): Promise<{user: User | null, error: AuthError | null}> => {
   try {
     const { data, error } = await supabase.auth.signUp({
@@ -33,7 +25,7 @@ export const createUser = async (email: string, password: string, userData: any)
       return { user: null, error };
     }
 
-    // Si la creación es exitosa, crear el registro en la tabla de usuarios
+    // If user creation is successful, create the record in the users table
     if (data.user) {
       const { error: userError } = await supabase
         .from('users')
@@ -51,7 +43,7 @@ export const createUser = async (email: string, password: string, userData: any)
 
       if (userError) {
         console.error('Error al crear registro de usuario:', userError.message);
-        // Si hay error al crear el registro, eliminar el usuario de auth
+        // If there's an error creating the record, delete the auth user
         await supabase.auth.admin.deleteUser(data.user.id);
         return { user: null, error: { name: 'Database Error', message: userError.message } as AuthError };
       }
@@ -64,7 +56,7 @@ export const createUser = async (email: string, password: string, userData: any)
   }
 };
 
-// Comprueba si el usuario administrador existe, si no existe, lo crea
+// Check if admin user exists, create if it doesn't
 export const setupDefaultUser = async () => {
   try {
     const adminEmail = 'admin1@example.com';
@@ -99,7 +91,7 @@ export const setupDefaultUser = async () => {
   }
 };
 
-// Configuración de suscripciones en tiempo real para tickets
+// Setup realtime subscriptions for tickets
 export const setupRealtimeSubscriptions = () => {
   // Suscripción a cambios en tickets
   const ticketsSubscription = supabase

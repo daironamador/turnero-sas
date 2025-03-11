@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -94,6 +93,7 @@ export const useLoginState = () => {
       setLoading(true);
       console.log(`Intentando iniciar sesión con: ${email}`);
       
+      // Using cookies for auth (defined in supabaseInit)
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
@@ -132,7 +132,6 @@ export const useLoginState = () => {
               toast({
                 title: "Advertencia de autenticación",
                 description: "Hay un problema temporal con la verificación, pero puede continuar usando el sistema.",
-                variant: "default"
               });
               
               setPersistence(rememberMe);
