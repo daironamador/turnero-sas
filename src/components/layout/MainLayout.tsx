@@ -37,10 +37,18 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6">
-        <div className="flex-1">
-          <h1 className="font-semibold text-lg md:text-xl">
-            {settings?.name || 'Sistema de Gestión de Turnos'}
-          </h1>
+        <div className="flex-1 flex items-center gap-2">
+          {settings?.logo ? (
+            <img 
+              src={settings.logo} 
+              alt="Logo" 
+              className="h-8 w-auto object-contain" 
+            />
+          ) : (
+            <h1 className="font-semibold text-lg md:text-xl">
+              {settings?.name || 'Sistema de Gestión de Turnos'}
+            </h1>
+          )}
         </div>
         <div className="flex items-center gap-4">
           <nav className="hidden md:flex items-center gap-4">

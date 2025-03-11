@@ -14,6 +14,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   const { user, loading } = useAuth();
   const location = useLocation();
 
+  // Allow access to /display without authentication
+  if (location.pathname === '/display') {
+    return <>{children}</>;
+  }
+
   // Show loading indicator while checking auth state
   if (loading) {
     return (
@@ -29,8 +34,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   // If allowedRoles is empty or user has the required role, render children
-  // Note: Role checking is simplified here and would need to be expanded
-  // based on how roles are actually stored in your system
   return <>{children}</>;
 };
 
