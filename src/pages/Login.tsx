@@ -8,14 +8,31 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
+import { getCompanySettings } from '@/services/settingsService';
+import { CompanySettings } from '@/lib/types';
 
 const Login = () => {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('admin1@example.com');
   const [password, setPassword] = useState('123456');
   const [error, setError] = useState<string | null>(null);
+  const [settings, setSettings] = useState<CompanySettings | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Cargar configuración de la empresa para mostrar el logo
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const data = await getCompanySettings();
+        setSettings(data);
+      } catch (error) {
+        console.error('Error al cargar configuración:', error);
+      }
+    };
+    
+    loadSettings();
+  }, []);
 
   // Check if user is already logged in
   useEffect(() => {
@@ -77,9 +94,21 @@ const Login = () => {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <div className="flex justify-center mb-4">
-            <img src="/logo.png" alt="Logo" className="h-16" />
+            {settings?.logo ? (
+              <img 
+                src={settings.logo} 
+                alt={settings?.name || 'Logo'} 
+                className="h-20 object-contain" 
+              />
+            ) : (
+              <div className="h-16 w-16 bg-gray-200 rounded-full flex items-center justify-center">
+                <span className="text-2xl font-bold text-gray-500">CO</span>
+              </div>
+            )}
           </div>
-          <CardTitle className="text-2xl text-center font-bold">Sistema de Gestión de Turnos</CardTitle>
+          <CardTitle className="text-2xl text-center font-bold">
+            {settings?.name || 'Sistema de Gestión de Turnos'}
+          </CardTitle>
           <CardDescription className="text-center">
             Ingrese sus credenciales para acceder al sistema
           </CardDescription>
@@ -113,7 +142,7 @@ const Login = () => {
               />
             </div>
             <div className="text-sm text-muted-foreground">
-              <p>Usuario: admin1@example.com</p>
+              <p>Usuario predeterminado: admin1@example.com</p>
               <p>Contraseña: 123456</p>
             </div>
           </CardContent>

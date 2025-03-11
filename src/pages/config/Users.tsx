@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import MainLayout from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from "@/components/ui/switch";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Select,
   SelectContent,
@@ -34,80 +35,15 @@ import {
 } from "@/components/ui/popover";
 import { format } from 'date-fns';
 import { Checkbox } from "@/components/ui/checkbox";
-
-// Mock data
-const mockServices: Service[] = [
-  {
-    id: '1',
-    code: 'CG',
-    name: 'Consulta General',
-    description: 'Atención oftalmológica general',
-    isActive: true,
-    createdAt: new Date()
-  },
-  {
-    id: '2',
-    code: 'RX',
-    name: 'Rayos X',
-    description: 'Servicio de radiografías',
-    isActive: true,
-    createdAt: new Date()
-  },
-  {
-    id: '3',
-    code: 'RR',
-    name: 'Recoger Resultados',
-    description: 'Entrega de resultados de exámenes',
-    isActive: true,
-    createdAt: new Date()
-  },
-];
-
-const mockUsers: User[] = [
-  {
-    id: '1',
-    username: 'admin',
-    name: 'Administrador',
-    email: 'admin@ocularclinic.com',
-    role: 'admin',
-    isActive: true,
-    serviceIds: ['1', '2', '3'],
-    createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-  },
-  {
-    id: '2',
-    username: 'recepcion',
-    name: 'Recepcionista',
-    email: 'recepcion@ocularclinic.com',
-    role: 'operator',
-    isActive: true,
-    serviceIds: ['1', '3'],
-    createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000)
-  },
-  {
-    id: '3',
-    username: 'radiologia',
-    name: 'Técnico de Radiología',
-    email: 'radiologia@ocularclinic.com',
-    role: 'operator',
-    isActive: false,
-    serviceIds: ['2'],
-    createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000)
-  },
-];
-
-// Add services to users for display
-const usersWithServices = mockUsers.map(user => ({
-  ...user,
-  services: mockServices.filter(s => user.serviceIds.includes(s.id))
-}));
+import { supabase, createUser } from '@/lib/supabase';
 
 const UserForm: React.FC<{
   user?: User;
   services: Service[];
-  onSave: (user: Partial<User>) => void;
+  onSave: (user: Partial<User>, password?: string) => void;
   onCancel: () => void;
-}> = ({ user, services, onSave, onCancel }) => {
+  isCreating: boolean;
+}> = ({ user, services, onSave, onCancel, isCreating }) => {
   const [formData, setFormData] = useState<Partial<User>>(
     user || {
       username: '',
@@ -118,15 +54,42 @@ const UserForm: React.FC<{
       serviceIds: []
     }
   );
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState<string | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const validatePasswords = () => {
+    if (isCreating) {
+      if (!password) {
+        setPasswordError('La contraseña es obligatoria');
+        return false;
+      }
+      if (password.length < 6) {
+        setPasswordError('La contraseña debe tener al menos 6 caracteres');
+        return false;
+      }
+      if (password !== confirmPassword) {
+        setPasswordError('Las contraseñas no coinciden');
+        return false;
+      }
+    }
+    setPasswordError(null);
+    return true;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(formData);
+    
+    if (!validatePasswords()) {
+      return;
+    }
+    
+    onSave(formData, isCreating ? password : undefined);
   };
 
   const toggleService = (serviceId: string) => {
@@ -183,6 +146,42 @@ const UserForm: React.FC<{
           placeholder="correo@ejemplo.com"
         />
       </div>
+      
+      {isCreating && (
+        <>
+          <div className="space-y-2">
+            <Label htmlFor="password">Contraseña</Label>
+            <Input
+              id="password"
+              name="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required={isCreating}
+              placeholder="Contraseña (mínimo 6 caracteres)"
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="confirmPassword">Confirmar Contraseña</Label>
+            <Input
+              id="confirmPassword"
+              name="confirmPassword"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required={isCreating}
+              placeholder="Repita la contraseña"
+            />
+          </div>
+          
+          {passwordError && (
+            <Alert variant="destructive">
+              <AlertDescription>{passwordError}</AlertDescription>
+            </Alert>
+          )}
+        </>
+      )}
       
       <div className="space-y-2">
         <Label htmlFor="role">Rol</Label>
@@ -257,66 +256,187 @@ const UserForm: React.FC<{
 
 const Users: React.FC = () => {
   const { toast } = useToast();
-  const [users, setUsers] = useState<User[]>(usersWithServices);
-  const [services] = useState<Service[]>(mockServices);
+  const [users, setUsers] = useState<User[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | undefined>(undefined);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSaveUser = (userData: Partial<User>) => {
-    if (currentUser) {
-      // Update existing user
-      const updatedUsers = users.map(u => {
-        if (u.id === currentUser.id) {
-          const updatedUser = { 
-            ...u, 
-            ...userData,
-            services: services.filter(s => (userData.serviceIds || []).includes(s.id))
-          };
-          return updatedUser;
+  // Load real users and services from Supabase
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        // Load services
+        const { data: servicesData, error: servicesError } = await supabase
+          .from('services')
+          .select('*');
+          
+        if (servicesError) {
+          throw servicesError;
         }
-        return u;
-      });
-      setUsers(updatedUsers);
+        
+        // Load users
+        const { data: usersData, error: usersError } = await supabase
+          .from('users')
+          .select('*');
+          
+        if (usersError) {
+          throw usersError;
+        }
+        
+        // Transform users data to match our User type
+        const transformedUsers = usersData.map(user => ({
+          id: user.id,
+          username: user.username,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          isActive: user.is_active,
+          serviceIds: user.service_ids || [],
+          services: servicesData.filter(s => (user.service_ids || []).includes(s.id)),
+          createdAt: new Date(user.created_at)
+        }));
+        
+        setServices(servicesData);
+        setUsers(transformedUsers);
+      } catch (error: any) {
+        console.error('Error al cargar datos:', error);
+        setError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadData();
+  }, []);
+
+  const handleSaveUser = async (userData: Partial<User>, password?: string) => {
+    try {
+      if (currentUser) {
+        // Update existing user
+        const { error } = await supabase
+          .from('users')
+          .update({
+            username: userData.username,
+            name: userData.name,
+            email: userData.email,
+            role: userData.role,
+            is_active: userData.isActive,
+            service_ids: userData.serviceIds
+          })
+          .eq('id', currentUser.id);
+          
+        if (error) throw error;
+        
+        // Update local state
+        const updatedUsers = users.map(u => {
+          if (u.id === currentUser.id) {
+            const updatedUser = { 
+              ...u, 
+              ...userData,
+              services: services.filter(s => (userData.serviceIds || []).includes(s.id))
+            };
+            return updatedUser;
+          }
+          return u;
+        });
+        
+        setUsers(updatedUsers);
+        toast({
+          title: "Usuario actualizado",
+          description: `Se ha actualizado el usuario ${userData.name}`,
+        });
+      } else {
+        // Create new user with auth
+        if (!password) {
+          throw new Error('Se requiere contraseña para crear un nuevo usuario');
+        }
+        
+        const { user, error } = await createUser(
+          userData.email || '',
+          password,
+          {
+            name: userData.name,
+            username: userData.username,
+            role: userData.role,
+            serviceIds: userData.serviceIds
+          }
+        );
+        
+        if (error) throw error;
+        
+        if (user) {
+          // Add to local state
+          const newUser: User = {
+            id: user.id,
+            username: userData.username || '',
+            name: userData.name || '',
+            email: userData.email || '',
+            role: userData.role || 'operator',
+            isActive: userData.isActive !== undefined ? userData.isActive : true,
+            serviceIds: userData.serviceIds || [],
+            services: services.filter(s => (userData.serviceIds || []).includes(s.id)),
+            createdAt: new Date(),
+          };
+          
+          setUsers([...users, newUser]);
+          toast({
+            title: "Usuario creado",
+            description: `Se ha creado el usuario ${newUser.name}`,
+          });
+        }
+      }
+      
+      setIsDialogOpen(false);
+      setCurrentUser(undefined);
+    } catch (error: any) {
+      console.error('Error al guardar usuario:', error);
       toast({
-        title: "Usuario actualizado",
-        description: `Se ha actualizado el usuario ${userData.name}`,
-      });
-    } else {
-      // Create new user
-      const newUser: User = {
-        id: crypto.randomUUID(),
-        username: userData.username || '',
-        name: userData.name || '',
-        email: userData.email || '',
-        role: userData.role || 'operator',
-        isActive: userData.isActive !== undefined ? userData.isActive : true,
-        serviceIds: userData.serviceIds || [],
-        services: services.filter(s => (userData.serviceIds || []).includes(s.id)),
-        createdAt: new Date(),
-      };
-      setUsers([...users, newUser]);
-      toast({
-        title: "Usuario creado",
-        description: `Se ha creado el usuario ${newUser.name}`,
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
       });
     }
-    setIsDialogOpen(false);
-    setCurrentUser(undefined);
   };
 
-  const toggleUserStatus = (id: string) => {
-    const updatedUsers = users.map(user => {
-      if (user.id === id) {
-        const newStatus = !user.isActive;
-        toast({
-          title: newStatus ? "Usuario activado" : "Usuario desactivado",
-          description: `Se ha ${newStatus ? 'activado' : 'desactivado'} el usuario ${user.name}`,
-        });
-        return { ...user, isActive: newStatus };
-      }
-      return user;
-    });
-    setUsers(updatedUsers);
+  const toggleUserStatus = async (id: string) => {
+    try {
+      const user = users.find(u => u.id === id);
+      if (!user) return;
+      
+      const newStatus = !user.isActive;
+      
+      // Update in database
+      const { error } = await supabase
+        .from('users')
+        .update({ is_active: newStatus })
+        .eq('id', id);
+        
+      if (error) throw error;
+      
+      // Update in local state
+      const updatedUsers = users.map(user => {
+        if (user.id === id) {
+          toast({
+            title: newStatus ? "Usuario activado" : "Usuario desactivado",
+            description: `Se ha ${newStatus ? 'activado' : 'desactivado'} el usuario ${user.name}`,
+          });
+          return { ...user, isActive: newStatus };
+        }
+        return user;
+      });
+      
+      setUsers(updatedUsers);
+    } catch (error: any) {
+      console.error('Error al cambiar estado:', error);
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
   };
 
   const openEditDialog = (user: User) => {
@@ -387,12 +507,21 @@ const Users: React.FC = () => {
                   setIsDialogOpen(false);
                   setCurrentUser(undefined);
                 }}
+                isCreating={!currentUser}
               />
             </DialogContent>
           </Dialog>
         </div>
         
-        {users.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ocular-600"></div>
+          </div>
+        ) : error ? (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : users.length === 0 ? (
           <Card className="border-dashed bg-muted/50">
             <CardContent className="flex flex-col items-center justify-center py-12">
               <FileWarning className="h-12 w-12 text-muted-foreground mb-4" />

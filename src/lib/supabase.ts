@@ -1,5 +1,6 @@
 
 import { createClient } from '@supabase/supabase-js';
+import { User, AuthError } from '@supabase/supabase-js';
 
 // Asegurarnos que las credenciales estén definidas correctamente
 const supabaseUrl = 'https://ymiohanwjypzkhjrtqlf.supabase.co';
@@ -10,6 +11,58 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// Función para crear un nuevo usuario
+export const createUser = async (email: string, password: string, userData: any): Promise<{user: User | null, error: AuthError | null}> => {
+  try {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          name: userData.name,
+          username: userData.username,
+          role: userData.role,
+          service_ids: userData.serviceIds
+        }
+      }
+    });
+
+    if (error) {
+      console.error('Error al crear usuario:', error.message);
+      return { user: null, error };
+    }
+
+    // Si la creación es exitosa, crear el registro en la tabla de usuarios
+    if (data.user) {
+      const { error: userError } = await supabase
+        .from('users')
+        .insert([
+          {
+            id: data.user.id,
+            email: email,
+            username: userData.username,
+            name: userData.name,
+            role: userData.role,
+            service_ids: userData.serviceIds,
+            is_active: true
+          }
+        ]);
+
+      if (userError) {
+        console.error('Error al crear registro de usuario:', userError.message);
+        // Si hay error al crear el registro, eliminar el usuario de auth
+        await supabase.auth.admin.deleteUser(data.user.id);
+        return { user: null, error: { name: 'Database Error', message: userError.message } as AuthError };
+      }
+    }
+
+    return { user: data.user, error: null };
+  } catch (error) {
+    console.error('Error inesperado al crear usuario:', error);
+    return { user: null, error: { name: 'Unexpected Error', message: 'Error inesperado al crear usuario' } as AuthError };
+  }
+};
 
 // Comprueba si el usuario administrador existe, si no existe, lo crea
 export const setupDefaultUser = async () => {
@@ -25,14 +78,11 @@ export const setupDefaultUser = async () => {
     // Si hay un error de credenciales inválidas, intentamos crear el usuario
     if (userError && userError.message.includes('Invalid login credentials')) {
       console.log('Creando usuario administrador predeterminado...');
-      const { data, error } = await supabase.auth.signUp({
-        email: adminEmail,
-        password: '123456',
-        options: {
-          data: {
-            role: 'admin'
-          }
-        }
+      const { user, error } = await createUser(adminEmail, '123456', {
+        name: 'Administrador',
+        username: 'admin1',
+        role: 'admin',
+        serviceIds: []
       });
       
       if (error) {
