@@ -17,17 +17,36 @@ export function useSpeechSynthesis() {
     }
   }, []);
 
+  // Format the ticket number to remove leading zeros and convert to a natural number
+  const formatTicketNumber = (ticketNumber: string): string => {
+    // Remove any non-numeric characters first
+    const numericOnly = ticketNumber.replace(/\D/g, '');
+    // Parse as integer to remove leading zeros
+    const numberValue = parseInt(numericOnly, 10);
+    
+    // Handle specific cases like 100, 200, etc.
+    if (numberValue % 100 === 0 && numberValue <= 900) {
+      const hundreds = numberValue / 100;
+      return hundreds === 1 ? "cien" : `${hundreds}cientos`;
+    }
+    
+    // Return the number as a string (already without leading zeros due to parseInt)
+    return numberValue.toString();
+  };
+
   // Function to announce ticket via speech synthesis
   const announceTicket = (ticketNumber: string, counterName: string) => {
     if (!window.speechSynthesis) return;
     
+    const formattedNumber = formatTicketNumber(ticketNumber);
+    
     const speech = new SpeechSynthesisUtterance();
-    speech.text = `Turno #${ticketNumber}, pasar a ${counterName}`;
+    speech.text = `Turno ${formattedNumber}, pasar a ${counterName}`;
     speech.volume = 1;
     speech.rate = 0.9;
     speech.pitch = 1;
     
-    // Try to find a Spanish Latin American voice first
+    // Try to find a Spanish Latin American voice first - prioritize these specific regions
     const latinAmericanVoices = voices.filter(voice => 
       (voice.lang.includes('es-MX') || 
        voice.lang.includes('es-419') || 
@@ -42,20 +61,28 @@ export function useSpeechSynthesis() {
       speech.voice = femaleVoice || latinAmericanVoices[0];
       speech.lang = speech.voice.lang;
     } else {
-      // Fallback to any Spanish voice
-      const spanishVoices = voices.filter(voice => voice.lang.includes('es'));
+      // Fallback to any Spanish voice, but try to avoid es-ES (Spain) if possible
+      const spanishVoices = voices.filter(voice => 
+        voice.lang.includes('es') && !voice.lang.includes('es-ES')
+      );
       
-      if (spanishVoices.length > 0) {
-        const femaleVoice = spanishVoices.find(v => v.name.includes('Female') || v.name.includes('female'));
-        speech.voice = femaleVoice || spanishVoices[0];
+      // If no non-Spain Spanish voices found, use any Spanish voice
+      const availableSpanishVoices = spanishVoices.length > 0 ? 
+        spanishVoices : 
+        voices.filter(voice => voice.lang.includes('es'));
+      
+      if (availableSpanishVoices.length > 0) {
+        const femaleVoice = availableSpanishVoices.find(v => v.name.includes('Female') || v.name.includes('female'));
+        speech.voice = femaleVoice || availableSpanishVoices[0];
         speech.lang = speech.voice.lang;
       } else {
-        // Last resort: use default voice but set language to Spanish
+        // Last resort: use default voice but set language to Spanish Latin America
         speech.lang = 'es-419'; // Spanish Latin America
       }
     }
     
     console.log(`Using voice: ${speech.voice?.name || 'Default'} (${speech.lang})`);
+    console.log(`Saying: "${speech.text}"`);
     
     window.speechSynthesis.speak(speech);
   };
