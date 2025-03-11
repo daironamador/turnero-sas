@@ -113,6 +113,7 @@ export function useTicketUpdates({
     // Handler for the custom recall event from the Llamada page
     const handleTicketRecalled = (event: CustomEvent) => {
       const { ticketNumber, counterName, redirectedFrom, originalRoomName } = event.detail;
+      console.info('Ticket recalled event received in Display:', event.detail);
       
       // Show notification
       if (roomsQuery.data) {
@@ -139,11 +140,9 @@ export function useTicketUpdates({
         redirectedFrom,
         originalRoomName
       );
-      
-      console.info('Ticket recalled event received:', event.detail);
     };
     
-    // Add event listener for the custom event
+    // Add event listener for the custom event with proper type casting for CustomEvent
     window.addEventListener('ticket-recalled', handleTicketRecalled as EventListener);
     
     return () => {
