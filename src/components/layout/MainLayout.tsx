@@ -33,9 +33,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         </div>
       </header>
 
-      <div className="flex">
+      <div className="md:flex">
         <aside
-          className={`fixed z-20 h-full w-72 shrink-0 border-r bg-background transition-transform md:translate-x-0 ${
+          className={`fixed z-20 h-full w-72 shrink-0 border-r bg-background transition-transform md:translate-x-0 md:shadow-none ${
             isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
@@ -150,7 +150,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           </div>
         </aside>
 
-        <main className={`flex-1 p-4 transition-all ${isSidebarOpen ? 'md:ml-72' : ''}`}>
+        <main className="flex-1 p-4">
           {children}
         </main>
       </div>
