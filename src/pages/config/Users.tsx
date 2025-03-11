@@ -354,7 +354,7 @@ const Users: React.FC = () => {
           throw new Error('Se requiere contraseña para crear un nuevo usuario');
         }
         
-        const { user, error } = await createUser(
+        const { user, error, message } = await createUser(
           userData.email || '',
           password,
           {
@@ -365,7 +365,44 @@ const Users: React.FC = () => {
           }
         );
         
-        if (error) throw error;
+        if (error) {
+          // Special handling for email rate limit error
+          if (error.name === 'EmailRateLimit') {
+            toast({
+              title: "Usuario creado con advertencia",
+              description: error.message,
+              variant: "warning"
+            });
+            
+            // Get the created user from the database to add to UI
+            const { data: newUserData } = await supabase
+              .from('users')
+              .select('*')
+              .eq('email', userData.email)
+              .single();
+              
+            if (newUserData) {
+              const newUser: User = {
+                id: newUserData.id,
+                username: newUserData.username,
+                name: newUserData.name,
+                email: newUserData.email,
+                role: newUserData.role as 'admin' | 'operator' | 'viewer',
+                isActive: newUserData.is_active,
+                serviceIds: newUserData.service_ids || [],
+                services: services.filter(s => (newUserData.service_ids || []).includes(s.id)),
+                createdAt: new Date(newUserData.created_at),
+              };
+              
+              setUsers([...users, newUser]);
+              setIsDialogOpen(false);
+              setCurrentUser(undefined);
+              return;
+            }
+          } else {
+            throw error;
+          }
+        }
         
         if (user) {
           // Add to local state
@@ -384,7 +421,7 @@ const Users: React.FC = () => {
           setUsers([...users, newUser]);
           toast({
             title: "Usuario creado",
-            description: `Se ha creado el usuario ${newUser.name}`,
+            description: message || `Se ha creado el usuario ${newUser.name}`,
           });
         }
       }

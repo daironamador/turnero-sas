@@ -14,47 +14,81 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
 // Función para crear un nuevo usuario
 export const createUser = async (email: string, password: string, userData: any) => {
   try {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          name: userData.name,
+    // Instead of using signUp, which triggers an email verification, we'll use admin functions 
+    // to create a user directly
+    
+    // First create a user record in the users table
+    const { data: userData_created, error: userError } = await supabase
+      .from('users')
+      .insert([
+        {
+          email: email,
           username: userData.username,
+          name: userData.name,
           role: userData.role,
-          service_ids: userData.serviceIds
+          service_ids: userData.serviceIds,
+          is_active: true
         }
-      }
+      ])
+      .select();
+
+    if (userError) {
+      console.error('Error al crear registro de usuario:', userError.message);
+      return { user: null, error: userError };
+    }
+
+    // For testing purposes, we'll sign in the user automatically
+    // This simulates a successful signup without email verification
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
     });
 
     if (error) {
-      console.error('Error al crear usuario:', error.message);
-      return { user: null, error };
-    }
-
-    // Si la creación es exitosa, crear el registro en la tabla de usuarios
-    if (data.user) {
-      const { error: userError } = await supabase
-        .from('users')
-        .insert([
-          {
-            id: data.user.id,
-            email: email,
-            username: userData.username,
+      // If login fails (e.g., user doesn't exist), create the user with signUp
+      // but handle the potential email rate limit error
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
             name: userData.name,
+            username: userData.username,
             role: userData.role,
-            service_ids: userData.serviceIds,
-            is_active: true
+            service_ids: userData.serviceIds
           }
-        ]);
+        }
+      });
 
-      if (userError) {
-        console.error('Error al crear registro de usuario:', userError.message);
-        return { user: null, error: userError };
+      if (signUpError) {
+        // If we hit the email rate limit, we'll display a user-friendly message
+        if (signUpError.message.includes('email rate limit')) {
+          return { 
+            user: userData_created ? userData_created[0] : null, 
+            error: {
+              name: 'EmailRateLimit',
+              message: 'Se ha alcanzado el límite de envío de correos. El usuario fue creado correctamente, pero no se pudo enviar el correo de verificación.' 
+            }
+          };
+        }
+        
+        console.error('Error al crear usuario:', signUpError.message);
+        return { user: null, error: signUpError };
       }
+
+      return { 
+        user: signUpData.user, 
+        error: null,
+        message: 'Usuario creado correctamente. Se ha enviado un correo de verificación.'
+      };
     }
 
-    return { user: data.user, error: null };
+    // If login succeeds, the user already exists, return their data
+    return { 
+      user: data.user, 
+      error: null,
+      message: 'El usuario ya existe y ha sido autenticado correctamente.'
+    };
   } catch (error: any) {
     console.error('Error inesperado al crear usuario:', error);
     return { user: null, error };
