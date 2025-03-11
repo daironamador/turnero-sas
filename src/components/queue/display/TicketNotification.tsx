@@ -12,6 +12,15 @@ interface TicketNotificationProps {
 const TicketNotification: React.FC<TicketNotificationProps> = ({ ticket, rooms }) => {
   if (!ticket) return null;
 
+  // Find room name safely
+  let roomName = `sala ${ticket.counterNumber}`;
+  if (rooms && ticket.counterNumber) {
+    const room = rooms.find(r => r.id === ticket.counterNumber);
+    if (room) {
+      roomName = room.name;
+    }
+  }
+
   return (
     <div className={`text-white p-4 animate-pulse ${ticket.isVip ? 'bg-yellow-500' : 'bg-ocular-500'}`}>
       <div className="container mx-auto flex items-center">
@@ -21,8 +30,8 @@ const TicketNotification: React.FC<TicketNotificationProps> = ({ ticket, rooms }
           {ticket.isVip && <Star className="ml-2 h-5 w-5" />}
         </span>
         <span className="text-xl">
-          {rooms && ticket.counterNumber ? 
-            `por favor dirigirse a ${rooms.find(r => r.id === ticket.counterNumber)?.name || `sala ${ticket.counterNumber}`}` : 
+          {ticket.counterNumber ? 
+            `por favor dirigirse a ${roomName}` : 
             "por favor dirigirse a recepción"}
         </span>
         <Volume2 className="w-6 h-6 ml-auto" />

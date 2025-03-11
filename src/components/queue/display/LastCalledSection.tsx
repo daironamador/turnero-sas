@@ -41,6 +41,17 @@ const LastCalledSection: React.FC<LastCalledSectionProps> = ({ tickets, rooms, i
               }
             }
             
+            // Format the time safely
+            let formattedTime = "";
+            try {
+              if (ticket.calledAt) {
+                formattedTime = format(ticket.calledAt, "HH:mm");
+              }
+            } catch (error) {
+              console.error("Error formatting date:", error);
+              formattedTime = "--:--";
+            }
+            
             return (
               <Card 
                 key={ticket.id} 
@@ -54,7 +65,7 @@ const LastCalledSection: React.FC<LastCalledSectionProps> = ({ tickets, rooms, i
                         {ticket.isVip && <Star className="ml-2 h-4 w-4 text-yellow-500" />}
                       </div>
                       <div className="flex items-center text-sm text-gray-500">
-                        {ServiceTypeLabels[ticket.serviceType]} • {format(ticket.calledAt!, "HH:mm")}
+                        {ServiceTypeLabels[ticket.serviceType]} • {formattedTime}
                         
                         {ticket.status === 'redirected' && ticket.redirectedTo && (
                           <Badge className="ml-2 bg-blue-100 text-blue-800 border-blue-200 flex items-center gap-1">
