@@ -97,6 +97,7 @@ const Login = () => {
       // Set up session storage type based on user preference
       if (stayLoggedIn) {
         // Use 'local' storage for persistent sessions
+        console.log('Setting session storage to local for persistent session');
         await supabase.auth.setSession({
           access_token: '',
           refresh_token: ''
@@ -104,6 +105,7 @@ const Login = () => {
       } else {
         // Use 'session' (memory) storage for non-persistent sessions
         // This is the default in newer versions of Supabase
+        console.log('Using default session (memory) storage');
       }
       
       // Sign in with Supabase Auth

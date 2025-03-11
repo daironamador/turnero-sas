@@ -29,6 +29,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (error) {
         console.error('Error refreshing session:', error);
+        setLoading(false); // Ensure loading ends even on error
         return;
       }
       
@@ -42,8 +43,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         console.log('No session found during refresh');
       }
+      
+      setLoading(false); // End loading state after refresh completes
     } catch (error) {
       console.error('Error getting session:', error);
+      setLoading(false); // Ensure loading ends even on error
     }
   };
 
@@ -54,8 +58,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await refreshUser();
       } catch (error) {
         console.error('Error getting session:', error);
-      } finally {
-        setLoading(false);
+        setLoading(false); // Ensure loading ends even on error
       }
     };
 
@@ -89,25 +92,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.log('Token refreshed successfully');
         }
         
-        setLoading(false);
+        setLoading(false); // Always end loading after any auth state change
       }
     );
 
     // Setup a periodic session check to prevent unexpected logouts
     const sessionCheckInterval = setInterval(async () => {
-      // Only check if we believe we have a session
-      if (session) {
+      // Only check if we believe we have a session and are not already loading
+      if (session && !loading) {
         console.log('Performing periodic session check...');
-        const { data, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.error('Session check error:', error);
-        } else if (data.session === null && session !== null) {
-          // Session was lost unexpectedly
-          console.warn('Session lost unexpectedly, attempting to recover');
-          await refreshUser();
-        } else {
-          console.log('Session check completed, session is valid');
+        try {
+          const { data, error } = await supabase.auth.getSession();
+          
+          if (error) {
+            console.error('Session check error:', error);
+          } else if (data.session === null && session !== null) {
+            // Session was lost unexpectedly
+            console.warn('Session lost unexpectedly, attempting to recover');
+            await refreshUser();
+          } else {
+            console.log('Session check completed, session is valid');
+          }
+        } catch (error) {
+          console.error('Error during session check:', error);
         }
       }
     }, 5 * 60 * 1000); // Check every 5 minutes
@@ -116,15 +123,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       subscription.unsubscribe();
       clearInterval(sessionCheckInterval);
     };
-  }, [session]);
+  }, [session, loading]);
 
   const signOut = async () => {
     try {
       console.log('Signing out user...');
+      setLoading(true); // Start loading before signout
       await supabase.auth.signOut();
+      setLoading(false); // End loading after signout
       toast('Sesión cerrada correctamente');
     } catch (error) {
       console.error('Error signing out:', error);
+      setLoading(false); // Ensure loading ends even on error
       toast('Error al cerrar sesión');
     }
   };
