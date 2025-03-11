@@ -94,7 +94,7 @@ const TicketManager: React.FC<TicketManagerProps> = ({
         // Create a properly typed updated ticket with the correct status
         const updatedTicket: Ticket = {
           ...ticket,
-          status: "serving" as const, // Explicitly set as serving with type assertion
+          status: "serving", // This is now correctly typed
           calledAt: new Date(),
           counterNumber: parseInt(counterNumber) || 0 // Ensure it's a number
         };

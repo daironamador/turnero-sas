@@ -1,16 +1,13 @@
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import DisplayScreen from '@/components/queue/DisplayScreen';
 import { Helmet } from 'react-helmet';
-import { Button } from '@/components/ui/button';
-import { Volume2, VolumeX } from 'lucide-react';
 import { toast } from 'sonner';
 
 const Display: React.FC = () => {
-  const [audioEnabled, setAudioEnabled] = useState(false);
   const audioInitialized = useRef(false);
   
-  // Function to request audio permission and initialize speech synthesis
+  // Function to auto-initialize speech synthesis
   const initializeAudio = () => {
     if (!window.speechSynthesis) {
       console.warn("Speech synthesis is not supported in this browser");
@@ -19,35 +16,41 @@ const Display: React.FC = () => {
     }
     
     try {
-      // Create a test utterance to request permission
-      const testUtterance = new SpeechSynthesisUtterance("Test");
-      testUtterance.volume = 0.1; // Almost silent test
+      // Initialize with a silent utterance to grant permissions
+      const testUtterance = new SpeechSynthesisUtterance("");
+      testUtterance.volume = 0; // Silent test
       testUtterance.onstart = () => {
-        console.log("Audio test started - permissions granted");
+        console.log("Audio initialized successfully");
+        audioInitialized.current = true;
       };
       testUtterance.onend = () => {
         console.log("Audio test completed successfully");
-        setAudioEnabled(true);
-        audioInitialized.current = true;
-        toast.success("Audio activado correctamente");
       };
       testUtterance.onerror = (e) => {
-        console.error("Audio test failed", e);
-        toast.error("Error al activar el audio. Intente nuevamente.");
+        console.error("Audio initialization failed", e);
+        toast.error("Error al inicializar el audio. Intente recargar la página.");
       };
       
-      // Try to speak to trigger permission request
+      // Speak silently to grant permissions
       window.speechSynthesis.speak(testUtterance);
       
-      // Ensure we load the voices
-      window.speechSynthesis.getVoices();
+      // Force load voices
+      if (speechSynthesis.onvoiceschanged !== undefined) {
+        speechSynthesis.onvoiceschanged = () => {
+          console.log("Voices loaded:", speechSynthesis.getVoices().length);
+        };
+      }
+      
+      // Get voices right away too
+      const voices = speechSynthesis.getVoices();
+      console.log("Initial voices loaded:", voices.length);
     } catch (error) {
       console.error("Failed to initialize audio:", error);
       toast.error("Error al inicializar el audio");
     }
   };
   
-  // Add a title-based ID to this page to make it identifiable
+  // Initialize page and audio
   useEffect(() => {
     document.title = "Sistema de Turnos - Display";
     // This helps identify this is the display page for cross-window communication
@@ -72,14 +75,9 @@ const Display: React.FC = () => {
       if (window.speechSynthesis) {
         console.log("Speech synthesis is supported in this browser");
         
-        // Auto-initialize audio if it hasn't been done yet
+        // Auto-initialize audio immediately
         if (!audioInitialized.current) {
-          setTimeout(() => {
-            const autoInit = window.confirm("¿Desea activar los anuncios de voz automáticamente?");
-            if (autoInit) {
-              initializeAudio();
-            }
-          }, 1000);
+          initializeAudio();
         }
       } else {
         console.warn("Speech synthesis is NOT supported in this browser - voice announcements will not work");
@@ -111,16 +109,6 @@ const Display: React.FC = () => {
         <title>Sistema de Turnos - Display</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Helmet>
-      
-      {!audioEnabled && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-yellow-100 p-4 flex items-center justify-center gap-4">
-          <p className="text-yellow-800">Para escuchar los anuncios de voz, haga clic en el botón:</p>
-          <Button onClick={initializeAudio} variant="outline" className="bg-white">
-            <Volume2 className="mr-2 h-4 w-4" />
-            Activar audio
-          </Button>
-        </div>
-      )}
       
       <DisplayScreen />
     </>

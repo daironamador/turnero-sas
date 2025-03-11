@@ -28,6 +28,7 @@ export function useTicketUpdates({
   const { announceTicket } = useSpeechSynthesis();
   const [processingAnnouncement, setProcessingAnnouncement] = useState(false);
   const announcementTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const processedAnnouncements = useRef<Set<string>>(new Set());
   
   const processTicketAnnouncement = (
     ticket: Ticket, 
@@ -35,19 +36,22 @@ export function useTicketUpdates({
     redirectedFrom?: string, 
     originalRoomName?: string
   ) => {
-    // Add guard to prevent duplicate announcement if already processing this ticket
-    if (processingAnnouncement && lastAnnounced === ticket.id) {
-      console.log(`Skipping duplicate announcement for ticket ${ticket.id}`);
+    // Create a unique key for this announcement to prevent duplicates
+    const announcementKey = `${ticket.id}-${Date.now()}`;
+    
+    // Check if we've already processed this specific announcement recently
+    if (processedAnnouncements.current.has(announcementKey)) {
+      console.log(`Skipping duplicate announcement for ticket ${ticket.ticketNumber} (${announcementKey})`);
       return;
     }
-
-    // Check if this ticket was recently announced (within the last 3 seconds)
-    if (lastAnnounced === ticket.id && 
-        ticket.calledAt && 
-        (Date.now() - ticket.calledAt.getTime() < 3000)) {
-      console.log(`Skipping recently announced ticket ${ticket.id}`);
-      return;
-    }
+    
+    // Add to processed set to prevent immediate duplicates
+    processedAnnouncements.current.add(announcementKey);
+    
+    // Clean up processed set after some time to prevent memory leaks
+    setTimeout(() => {
+      processedAnnouncements.current.delete(announcementKey);
+    }, 10000);
 
     console.log(`Processing announcement for ticket ${ticket.ticketNumber} on display`);
     
@@ -67,6 +71,25 @@ export function useTicketUpdates({
           redirectedFrom,
           originalRoomName
         );
+        
+        // Send acknowledgment back through BroadcastChannel
+        if (typeof BroadcastChannel !== 'undefined') {
+          try {
+            const ackChannel = new BroadcastChannel('ticket-announcements');
+            ackChannel.postMessage({
+              type: 'announcement-received',
+              ticketId: ticket.id,
+              timestamp: Date.now()
+            });
+            
+            // Close channel after sending
+            setTimeout(() => {
+              ackChannel.close();
+            }, 1000);
+          } catch (error) {
+            console.error('Error sending announcement acknowledgment:', error);
+          }
+        }
         
         // Clear any existing timeout for this ticket
         if (announcementTimeouts.current.has(ticket.id)) {
@@ -117,7 +140,7 @@ export function useTicketUpdates({
         ticketChannel.onmessage = (event) => {
           if (!event.data) return;
           
-          console.log('Received broadcast message in useTicketUpdates:', event.data);
+          console.log('Received broadcast message in useTicketUpdates:', event.data.type);
           
           if (event.data.type === 'announce-ticket') {
             const { ticket, counterName, redirectedFrom, originalRoomName } = event.data;

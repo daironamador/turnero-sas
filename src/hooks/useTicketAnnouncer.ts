@@ -19,6 +19,17 @@ export function useTicketAnnouncer() {
         
         console.log("BroadcastChannel for ticket announcements initialized");
         
+        // Setup message listener for acknowledgments
+        channel.onmessage = (event) => {
+          if (event.data?.type === 'announcement-received' && event.data?.ticketId) {
+            console.log(`Received acknowledgment for ticket ${event.data.ticketId}`);
+            // Clear any pending resend attempts for this ticket
+            if (resendAttemptsRef.current.has(event.data.ticketId)) {
+              resendAttemptsRef.current.delete(event.data.ticketId);
+            }
+          }
+        };
+        
         return () => {
           channel.close();
         };
@@ -44,9 +55,9 @@ export function useTicketAnnouncer() {
       // Send the announcement
       try {
         ticketChannel.postMessage(nextAnnouncement);
-        console.log("Sent announcement from queue:", nextAnnouncement);
+        console.log("Sent announcement from queue:", nextAnnouncement.ticket?.ticketNumber);
         
-        // Add a resend attempt after 3 seconds if we don't receive acknowledgement
+        // Add a resend attempt after a delay if we don't receive acknowledgement
         const ticketId = nextAnnouncement.ticket?.id;
         if (ticketId) {
           const currentAttempts = resendAttemptsRef.current.get(ticketId) || 0;
@@ -57,8 +68,12 @@ export function useTicketAnnouncer() {
             
             // Wait for acknowledgment or resend
             setTimeout(() => {
-              setAnnouncementQueue(prev => [nextAnnouncement, ...prev]);
-            }, 5000); // Resend after 5 seconds if no acknowledgment
+              // Only resend if we haven't received an acknowledgment
+              if (resendAttemptsRef.current.has(ticketId)) {
+                console.log(`No acknowledgment received for ticket ${ticketId}, attempt ${currentAttempts + 1}/${maxRetries}`);
+                setAnnouncementQueue(prev => [nextAnnouncement, ...prev]);
+              }
+            }, 3000); // Resend after 3 seconds if no acknowledgment
           } else {
             console.warn(`Max resend attempts (${maxRetries}) reached for ticket ${ticketId}`);
             resendAttemptsRef.current.delete(ticketId);
@@ -71,7 +86,7 @@ export function useTicketAnnouncer() {
       // Allow the next announcement after a delay
       setTimeout(() => {
         setIsProcessing(false);
-      }, 2000);
+      }, 1000);
     }
   }, [announcementQueue, isProcessing, ticketChannel]);
 
@@ -107,10 +122,11 @@ export function useTicketAnnouncer() {
       ticket: updatedTicket,
       counterName: counterName,
       redirectedFrom: ticket.redirectedFrom,
-      originalRoomName: originalRoomName
+      originalRoomName: originalRoomName,
+      timestamp: Date.now() // Add timestamp for debugging
     };
     
-    console.log("Preparing ticket announcement:", updatedTicket, "to counter:", counterName);
+    console.log("Preparing ticket announcement:", updatedTicket.ticketNumber, "to counter:", counterName);
     
     // If we don't have a channel yet or if we're already processing, queue the announcement
     if (!ticketChannel || isProcessing) {
