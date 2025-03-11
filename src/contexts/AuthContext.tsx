@@ -46,12 +46,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Save persistence setting to localStorage
     localStorage.setItem('auth-persistence', JSON.stringify(isPersistent));
     setIsPersistent(isPersistent);
+    
+    // Update session persistence setting in Supabase
+    if (session) {
+      // Apply persistence setting to current session
+      supabase.auth.updateSession({
+        refresh_token: session.refresh_token,
+      });
+    }
   };
 
   useEffect(() => {
     const getSession = async () => {
       setLoading(true);
       try {
+        // Get existing session first
         await refreshUser();
       } catch (error) {
         console.error('Error getting session:', error);
@@ -62,6 +71,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     getSession();
 
+    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         console.log('Auth state changed:', _event);

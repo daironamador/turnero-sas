@@ -40,7 +40,8 @@ const CurrentTicket: React.FC<CurrentTicketProps> = ({
       // Send the ticket data to the display page
       ticketChannel.postMessage({
         type: 'announce-ticket',
-        ticket: currentTicket
+        ticket: currentTicket,
+        message: `Turno #${currentTicket.ticketNumber} pasar a ${currentTicket.serviceType}`
       });
       
       // Close the channel after sending the message
