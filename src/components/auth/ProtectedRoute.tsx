@@ -21,22 +21,22 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   // Attempt to refresh the user session when the component mounts, but only once
   useEffect(() => {
     const checkAndRefreshSession = async () => {
-      if (!user && !refreshAttempted && !loading) {
+      if (!user && !refreshAttempted && !loading && !isRefreshing) {
         console.log('No user found, attempting to refresh session once');
         setIsRefreshing(true);
         try {
           await refreshUser();
-          setRefreshAttempted(true);
         } catch (error) {
           console.error('Error refreshing user session:', error);
         } finally {
           setIsRefreshing(false);
+          setRefreshAttempted(true);
         }
       }
     };
     
     checkAndRefreshSession();
-  }, [user, refreshUser, refreshAttempted, loading]);
+  }, [user, refreshUser, refreshAttempted, loading, isRefreshing]);
 
   // Allow access to /display without authentication
   if (location.pathname === '/display') {

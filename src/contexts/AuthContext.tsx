@@ -23,15 +23,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [userRole, setUserRole] = useState<string>('viewer');
   const [refreshCount, setRefreshCount] = useState(0);
   const [lastRefreshTime, setLastRefreshTime] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const refreshUser = async () => {
-    // Prevent too frequent refreshes (minimum 2 seconds between refreshes)
+    // Prevent too frequent refreshes (minimum 5 seconds between refreshes)
     const now = Date.now();
-    if (now - lastRefreshTime < 2000) {
+    if (now - lastRefreshTime < 5000) {
       console.log('Skipping refresh - too soon since last refresh');
       return;
     }
     
+    // Prevent concurrent refreshes
+    if (isRefreshing) {
+      console.log('Skipping refresh - already refreshing');
+      return;
+    }
+    
+    setIsRefreshing(true);
     setLastRefreshTime(now);
     
     try {
@@ -40,7 +48,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (error) {
         console.error('Error refreshing session:', error);
-        setLoading(false);
         return;
       }
       
@@ -59,6 +66,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error) {
       console.error('Error getting session:', error);
     } finally {
+      setIsRefreshing(false);
       setLoading(false);
     }
   };
@@ -116,8 +124,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Setup a periodic session check but only if we have a session
     const sessionCheckInterval = setInterval(async () => {
-      // Only check if we believe we have a session and are not already loading
-      if (session && !loading) {
+      // Only check if we believe we have a session and are not already loading or refreshing
+      if (session && !loading && !isRefreshing) {
         console.log('Performing periodic session check...');
         try {
           const { data, error } = await supabase.auth.getSession();
@@ -142,13 +150,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.error('Error during session check:', error);
         }
       }
-    }, 5 * 60 * 1000); // Check every 5 minutes
+    }, 15 * 60 * 1000); // Check every 15 minutes instead of 5
 
     return () => {
       subscription.unsubscribe();
       clearInterval(sessionCheckInterval);
     };
-  }, [session, loading, refreshCount]);
+  }, [session, loading, refreshCount, isRefreshing]);
 
   const signOut = async () => {
     try {

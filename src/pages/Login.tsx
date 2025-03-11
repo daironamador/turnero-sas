@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -66,11 +65,7 @@ const Login = () => {
       // Sign in with Supabase Auth
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
-        password,
-        options: {
-          // Set persistence based on stayLoggedIn preference
-          persistSession: stayLoggedIn
-        }
+        password
       });
       
       // If there's an auth error
