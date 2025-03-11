@@ -1,3 +1,4 @@
+
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
@@ -55,6 +56,12 @@ export function useTicketUpdates({
         const { ticket, counterName, redirectedFrom, originalRoomName } = event.data;
         
         if (ticket) {
+          // Prevent double processing the same ticket
+          if (lastAnnounced === ticket.id) {
+            console.log(`Skipping already announced ticket ${ticket.id}`);
+            return;
+          }
+          
           // Update the display with the notification
           setNewlyCalledTicket(ticket);
           
@@ -90,7 +97,8 @@ export function useTicketUpdates({
     queryClient, 
     roomsQuery.data, 
     announceTicket, 
-    setNewlyCalledTicket, 
+    setNewlyCalledTicket,
+    lastAnnounced, // Re-add this dependency to listen for changes
     setLastAnnounced
   ]);
   
