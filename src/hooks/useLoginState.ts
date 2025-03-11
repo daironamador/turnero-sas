@@ -51,14 +51,13 @@ export const useLoginState = () => {
           return;
         }
         
-        console.log('Login: No active session, checking localStorage and sessionStorage...');
-        // Try localStorage first (for "remember me")
-        const storedSession = localStorage.getItem('supabase.auth.token');
-        // Also check sessionStorage as an alternative (for current session only)
-        const sessionStorageSession = sessionStorage.getItem('supabase.auth.token');
+        console.log('Login: No active session, checking localStorage...');
+        // Check localStorage for tokens
+        const storedToken = localStorage.getItem('supabase.auth.token');
+        const storedRefreshToken = localStorage.getItem('supabase.auth.refresh_token');
         
-        if (storedSession || sessionStorageSession) {
-          console.log('Login: Found stored session, attempting to restore');
+        if (storedToken && storedRefreshToken) {
+          console.log('Login: Found stored tokens, attempting to restore');
           const success = await refreshUser();
           
           if (success) {
@@ -69,7 +68,7 @@ export const useLoginState = () => {
             console.log('Login: Failed to restore session, showing login form');
           }
         } else {
-          console.log('Login: No stored session found, showing login form');
+          console.log('Login: No stored tokens found, showing login form');
         }
       } catch (error) {
         console.error('Login: Error checking session:', error);
@@ -169,20 +168,14 @@ export const useLoginState = () => {
       
       setPersistence(rememberMe);
       
-      // Store session token explicitly to both storage mechanisms
+      // Store tokens explicitly in localStorage
       if (data && data.session) {
         const token = data.session.access_token;
         const refreshToken = data.session.refresh_token;
         
-        // Store in sessionStorage (temporary, cleared when tab is closed)
-        sessionStorage.setItem('supabase.auth.token', token);
-        sessionStorage.setItem('supabase.auth.refresh_token', refreshToken);
-        
-        // If remember me is checked, also store in localStorage (persistent)
-        if (rememberMe) {
-          localStorage.setItem('supabase.auth.token', token);
-          localStorage.setItem('supabase.auth.refresh_token', refreshToken);
-        }
+        // Always store in localStorage
+        localStorage.setItem('supabase.auth.token', token);
+        localStorage.setItem('supabase.auth.refresh_token', refreshToken);
       }
       
       toast({

@@ -8,7 +8,7 @@ type AuthContextType = {
   user: User | null;
   loading: boolean;
   signOut: () => Promise<void>;
-  refreshUser: () => Promise<boolean>; // Changed return type to Promise<boolean>
+  refreshUser: () => Promise<boolean>; 
   userRole: string;
   setPersistence: (isPersistent: boolean) => void;
   isPersistent: boolean;
@@ -36,8 +36,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
-        // Store the session in localStorage for persistence
-        localStorage.setItem('supabase-auth-session', JSON.stringify(currentSession));
+        // Always store the session in localStorage for persistence
+        localStorage.setItem('supabase.auth.token', currentSession.access_token);
+        localStorage.setItem('supabase.auth.refresh_token', currentSession.refresh_token);
         
         // Set user role from metadata
         if (currentSession?.user) {
@@ -55,16 +56,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const setPersistence = (isPersistent: boolean) => {
-    // Store in localStorage (more persistent than sessionStorage)
+    // Store persistence setting in localStorage
     localStorage.setItem('auth-persistence', JSON.stringify(isPersistent));
     setIsPersistent(isPersistent);
     
-    // Update session persistence setting in Supabase
+    // If there's an active session, ensure it persists according to the setting
     if (session) {
-      supabase.auth.setSession({
-        access_token: session.access_token,
-        refresh_token: session.refresh_token,
-      });
+      if (isPersistent) {
+        // Ensure session is stored in localStorage when persistence is enabled
+        localStorage.setItem('supabase.auth.token', session.access_token);
+        localStorage.setItem('supabase.auth.refresh_token', session.refresh_token);
+      } else {
+        // Clear from localStorage when persistence is disabled
+        localStorage.removeItem('supabase.auth.token');
+        localStorage.removeItem('supabase.auth.refresh_token');
+      }
     }
   };
 
@@ -82,69 +88,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setSession(currentSession);
           setUser(currentSession.user);
           setUserRole(currentSession.user.user_metadata?.role || 'viewer');
-          // Always store in localStorage for persistence across refreshes
-          localStorage.setItem('supabase-auth-session', JSON.stringify(currentSession));
-          // Also store in sessionStorage for current browser session
-          sessionStorage.setItem('supabase-auth-session', JSON.stringify(currentSession));
+          
+          // Always store tokens in localStorage for persistence
+          localStorage.setItem('supabase.auth.token', currentSession.access_token);
+          localStorage.setItem('supabase.auth.refresh_token', currentSession.refresh_token);
         } else {
           console.log('No active session found, checking localStorage...');
           // If no current session, try to restore from localStorage
-          const storedSession = localStorage.getItem('supabase-auth-session');
+          const storedToken = localStorage.getItem('supabase.auth.token');
+          const storedRefreshToken = localStorage.getItem('supabase.auth.refresh_token');
           
-          if (!storedSession) {
-            // Try sessionStorage as fallback
-            const sessionStorageSession = sessionStorage.getItem('supabase-auth-session');
-            if (sessionStorageSession) {
-              console.log('Found session in sessionStorage, attempting to restore...');
-              try {
-                const parsedSession = JSON.parse(sessionStorageSession);
-                const { data, error } = await supabase.auth.setSession({
-                  access_token: parsedSession.access_token,
-                  refresh_token: parsedSession.refresh_token,
-                });
-                
-                if (error) {
-                  console.error('Error restoring session from sessionStorage:', error);
-                  sessionStorage.removeItem('supabase-auth-session');
-                } else if (data && data.session) {
-                  console.log('Session restored successfully from sessionStorage:', data.session.user.email);
-                  setSession(data.session);
-                  setUser(data.session.user);
-                  setUserRole(data.session.user.user_metadata?.role || 'viewer');
-                  // Also update localStorage for future persistence
-                  localStorage.setItem('supabase-auth-session', JSON.stringify(data.session));
-                }
-              } catch (parseError) {
-                console.error('Error parsing stored session from sessionStorage:', parseError);
-                sessionStorage.removeItem('supabase-auth-session');
-              }
-            } else {
-              console.log('No stored session found in either localStorage or sessionStorage');
-            }
-          } else {
-            console.log('Stored session found in localStorage, attempting to restore...');
+          if (storedToken && storedRefreshToken) {
+            console.log('Found tokens in localStorage, attempting to restore session...');
             try {
-              const parsedSession = JSON.parse(storedSession);
               const { data, error } = await supabase.auth.setSession({
-                access_token: parsedSession.access_token,
-                refresh_token: parsedSession.refresh_token,
+                access_token: storedToken,
+                refresh_token: storedRefreshToken,
               });
               
               if (error) {
-                console.error('Error restoring session:', error);
-                localStorage.removeItem('supabase-auth-session');
+                console.error('Error restoring session from localStorage:', error);
+                localStorage.removeItem('supabase.auth.token');
+                localStorage.removeItem('supabase.auth.refresh_token');
               } else if (data && data.session) {
-                console.log('Session restored successfully:', data.session.user.email);
+                console.log('Session restored successfully from localStorage:', data.session.user.email);
                 setSession(data.session);
                 setUser(data.session.user);
                 setUserRole(data.session.user.user_metadata?.role || 'viewer');
-                // Also update sessionStorage
-                sessionStorage.setItem('supabase-auth-session', JSON.stringify(data.session));
               }
             } catch (parseError) {
-              console.error('Error parsing stored session:', parseError);
-              localStorage.removeItem('supabase-auth-session');
+              console.error('Error restoring session from localStorage:', parseError);
+              localStorage.removeItem('supabase.auth.token');
+              localStorage.removeItem('supabase.auth.refresh_token');
             }
+          } else {
+            console.log('No stored tokens found in localStorage');
           }
         }
       } catch (error) {
@@ -160,20 +138,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
       console.log('Auth state changed:', event, newSession?.user?.email);
       
-      // Store session in both localStorage and sessionStorage for events that have a valid session
+      // Store tokens in localStorage for events that have a valid session
       if (newSession) {
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-          console.log('Storing session in storage due to event:', event);
-          localStorage.setItem('supabase-auth-session', JSON.stringify(newSession));
-          sessionStorage.setItem('supabase-auth-session', JSON.stringify(newSession));
+          console.log('Storing session tokens in localStorage due to event:', event);
+          localStorage.setItem('supabase.auth.token', newSession.access_token);
+          localStorage.setItem('supabase.auth.refresh_token', newSession.refresh_token);
         }
       }
       
-      // Remove session from storage when user logs out
+      // Remove tokens from localStorage when user logs out
       if (event === 'SIGNED_OUT') {
-        console.log('Removing session from storage');
-        localStorage.removeItem('supabase-auth-session');
-        sessionStorage.removeItem('supabase-auth-session');
+        console.log('Removing session tokens from localStorage');
+        localStorage.removeItem('supabase.auth.token');
+        localStorage.removeItem('supabase.auth.refresh_token');
       }
       
       setSession(newSession);
@@ -197,10 +175,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    // Clear stored data from localStorage and sessionStorage when signing out
+    // Clear stored data from localStorage when signing out
     localStorage.removeItem('auth-persistence');
-    localStorage.removeItem('supabase-auth-session');
-    sessionStorage.removeItem('supabase-auth-session');
+    localStorage.removeItem('supabase.auth.token');
+    localStorage.removeItem('supabase.auth.refresh_token');
     setIsPersistent(false);
   };
 
