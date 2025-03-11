@@ -17,7 +17,7 @@ export function useSpeechSynthesis() {
     }
   }, []);
 
-  // Format the ticket number to remove leading zeros and convert to a natural number
+  // Format the ticket number to spell out service code letters and format the numeric part
   const formatTicketNumber = (ticketNumber: string): string => {
     // Extract service code prefix (like CG, RX) and the numeric part
     const serviceCodeMatch = ticketNumber.match(/^([A-Z]+)(\d+)$/);
@@ -29,7 +29,8 @@ export function useSpeechSynthesis() {
       // Convert numeric part to integer to remove leading zeros
       const numberValue = parseInt(numericPart, 10);
       
-      // Spell out the service code letters individually
+      // Spell out each letter individually in the service code
+      // This creates pronunciations like "C G" for "CG"
       const spellOutServiceCode = serviceCode.split('').join(' ');
       
       // Handle specific cases like 100, 200, etc.
