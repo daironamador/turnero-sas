@@ -9,7 +9,7 @@ import { Room, Service, Ticket } from '@/lib/types';
 import { toast } from 'sonner';
 
 const Llamada: React.FC = () => {
-  const [counterNumber, setCounterNumber] = useState<number>(1);
+  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [currentTicket, setCurrentTicket] = useState<Ticket | undefined>(undefined);
   
   // Fetch waiting tickets
@@ -24,14 +24,14 @@ const Llamada: React.FC = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('rooms')
-        .select('*')
+        .select('*, services:service_id(id, code, name)')
         .eq('is_active', true);
       
       if (error) {
         throw error;
       }
       
-      return data as Room[];
+      return data as (Room & { services: Service })[];
     },
   });
 
@@ -55,18 +55,19 @@ const Llamada: React.FC = () => {
   // Handle ticket changes (refresh data)
   const handleTicketChange = () => {
     waitingTicketsQuery.refetch();
-    // Find a ticket currently being served at this counter
     fetchCurrentTicket();
   };
 
-  // Fetch the current ticket being served at this counter
+  // Fetch the current ticket being served at this room
   const fetchCurrentTicket = async () => {
+    if (!selectedRoom) return;
+    
     try {
       const { data, error } = await supabase
         .from('tickets')
         .select('*')
         .eq('status', 'serving')
-        .eq('counter_number', counterNumber)
+        .eq('counter_number', selectedRoom.id)
         .order('called_at', { ascending: false })
         .limit(1);
       
@@ -100,7 +101,7 @@ const Llamada: React.FC = () => {
   // Initial data fetching
   useEffect(() => {
     fetchCurrentTicket();
-  }, [counterNumber]);
+  }, [selectedRoom]);
 
   // Listen for real-time updates
   useEffect(() => {
@@ -141,29 +142,43 @@ const Llamada: React.FC = () => {
       <div className="mb-4 flex justify-between items-center">
         <h1 className="text-2xl font-bold">Llamada de Tickets</h1>
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">Counter:</span>
+          <span className="text-sm font-medium">Sala:</span>
           <select 
             className="border rounded px-2 py-1 bg-background"
-            value={counterNumber}
-            onChange={(e) => setCounterNumber(Number(e.target.value))}
+            value={selectedRoom?.id || ""}
+            onChange={(e) => {
+              const roomId = e.target.value;
+              const room = roomsQuery.data?.find(r => r.id === roomId);
+              setSelectedRoom(room || null);
+            }}
           >
-            {[1, 2, 3, 4, 5].map(num => (
-              <option key={num} value={num}>
-                {num}
+            <option value="">Seleccionar Sala</option>
+            {roomsQuery.data?.map(room => (
+              <option key={room.id} value={room.id}>
+                {room.name} ({room.number})
               </option>
             ))}
           </select>
         </div>
       </div>
       
-      <TicketManager 
-        currentTicket={currentTicket}
-        waitingTickets={waitingTicketsQuery.data || []}
-        rooms={roomsQuery.data || []}
-        services={servicesQuery.data || []}
-        counterNumber={counterNumber}
-        onTicketChange={handleTicketChange}
-      />
+      {selectedRoom ? (
+        <TicketManager 
+          currentTicket={currentTicket}
+          waitingTickets={waitingTicketsQuery.data?.filter(
+            ticket => ticket.serviceType === selectedRoom.services.code
+          ) || []}
+          rooms={roomsQuery.data || []}
+          services={servicesQuery.data || []}
+          counterNumber={selectedRoom.id}
+          counterName={selectedRoom.name}
+          onTicketChange={handleTicketChange}
+        />
+      ) : (
+        <div className="rounded-md border p-4 text-center">
+          <p className="text-muted-foreground">Por favor seleccione una sala para comenzar</p>
+        </div>
+      )}
     </MainLayout>
   );
 };

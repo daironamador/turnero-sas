@@ -1,3 +1,4 @@
+
 import { supabase } from '@/lib/supabase';
 import { ServiceType, Ticket } from '@/lib/types';
 import { format } from 'date-fns';
@@ -118,7 +119,7 @@ export const updateTicketStatus = async (id: string, status: string, updates: an
 };
 
 // Llamar a un ticket (cambiar estado a serving)
-export const callTicket = async (id: string, counterNumber: number): Promise<Ticket> => {
+export const callTicket = async (id: string, counterNumber: string): Promise<Ticket> => {
   return updateTicketStatus(id, 'serving', { 
     called_at: new Date().toISOString(),
     counter_number: counterNumber 

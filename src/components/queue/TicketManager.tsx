@@ -1,7 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { toast } from 'sonner';
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -17,14 +16,13 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
+  DialogFooter,
 } from "@/components/ui/dialog";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { Service, Ticket, Room, ServiceType } from '@/lib/types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { CheckCheck, ChevronsUpDown, PhoneCall, UserPlus, XCircle } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { CheckCheck, ChevronsUpDown, PhoneCall, XCircle } from 'lucide-react';
 import { 
   callTicket, 
   completeTicket, 
@@ -33,7 +31,7 @@ import {
 } from '@/services/ticketService';
 
 // Define types for mutation parameters
-type CallTicketParams = { ticketId: string; counterNumber: number };
+type CallTicketParams = { ticketId: string; counterNumber: string };
 type CompleteTicketParams = { ticketId: string };
 type CancelTicketParams = { ticketId: string };
 type RedirectTicketParams = { ticketId: string; serviceType: ServiceType };
@@ -43,7 +41,8 @@ interface TicketManagerProps {
   waitingTickets: Ticket[];
   rooms: Room[];
   services: Service[];
-  counterNumber: number;
+  counterNumber: string;
+  counterName?: string;
   onTicketChange: () => void;
 }
 
@@ -53,18 +52,20 @@ const TicketManager: React.FC<TicketManagerProps> = ({
   rooms, 
   services, 
   counterNumber,
+  counterName,
   onTicketChange
 }) => {
-  const queryClient = useQueryClient();
   const [isRedirectDialogOpen, setIsRedirectDialogOpen] = useState(false);
   const [selectedService, setSelectedService] = useState<string | undefined>(undefined);
+
+  const nextTicket = waitingTickets.length > 0 ? waitingTickets[0] : undefined;
 
   // Mutations
   const callTicketMutation = useMutation({
     mutationFn: (params: CallTicketParams) => 
       callTicket(params.ticketId, params.counterNumber),
     onSuccess: () => {
-      toast(`Se ha llamado al ticket ${currentTicket?.ticketNumber} en el counter ${counterNumber}`);
+      toast(`Se ha llamado al ticket ${nextTicket?.ticketNumber} en ${counterName || 'la sala seleccionada'}`);
       onTicketChange();
     },
     onError: (error: any) => {
@@ -107,9 +108,9 @@ const TicketManager: React.FC<TicketManagerProps> = ({
   });
 
   const handleCallNext = async () => {
-    if (!currentTicket) return;
+    if (!nextTicket) return;
     callTicketMutation.mutate({ 
-      ticketId: currentTicket.id, 
+      ticketId: nextTicket.id, 
       counterNumber 
     });
   };
@@ -166,9 +167,9 @@ const TicketManager: React.FC<TicketManagerProps> = ({
                   <span className="font-medium">Paciente:</span> {currentTicket.patientName}
                 </p>
               )}
-              {currentTicket.counterNumber && (
+              {counterName && (
                 <p>
-                  <span className="font-medium">Counter:</span> {currentTicket.counterNumber}
+                  <span className="font-medium">Sala:</span> {counterName}
                 </p>
               )}
               <p>
@@ -210,18 +211,59 @@ const TicketManager: React.FC<TicketManagerProps> = ({
       )}
 
       <div className="rounded-md border p-4">
-        <h3 className="text-lg font-semibold">Acciones</h3>
+        <h3 className="text-lg font-semibold">
+          {nextTicket ? 'Siguiente Ticket' : 'No hay tickets en espera'}
+        </h3>
+        {nextTicket && (
+          <div className="mt-2 mb-4">
+            <p><span className="font-medium">Número:</span> {nextTicket.ticketNumber}</p>
+            <p><span className="font-medium">Servicio:</span> {nextTicket.serviceType}</p>
+            {nextTicket.patientName && (
+              <p><span className="font-medium">Paciente:</span> {nextTicket.patientName}</p>
+            )}
+            <p>
+              <span className="font-medium">En espera desde:</span>{' '}
+              {format(new Date(nextTicket.createdAt), "h:mm a", { locale: es })}
+            </p>
+          </div>
+        )}
         <div className="mt-2 flex justify-center">
           <Button 
             className="w-full"
             onClick={handleCallNext} 
-            disabled={callTicketMutation.isPending || !waitingTickets.length}
+            disabled={callTicketMutation.isPending || !nextTicket}
           >
             {callTicketMutation.isPending ? 'Llamando...' : 'Llamar Siguiente'}
             <PhoneCall className="w-4 h-4 ml-2" />
           </Button>
         </div>
       </div>
+
+      {waitingTickets.length > 0 && (
+        <div className="rounded-md border p-4">
+          <h3 className="text-lg font-semibold">Cola de Espera ({waitingTickets.length})</h3>
+          <div className="mt-2 space-y-2">
+            {waitingTickets.slice(0, 5).map((ticket, index) => (
+              <div key={ticket.id} className="flex justify-between items-center p-2 border-b last:border-b-0">
+                <div>
+                  <span className="font-medium">{ticket.ticketNumber}</span>
+                  {ticket.patientName && (
+                    <span className="ml-2 text-sm text-muted-foreground">{ticket.patientName}</span>
+                  )}
+                </div>
+                <span className="text-sm text-muted-foreground">
+                  {format(new Date(ticket.createdAt), "h:mm a", { locale: es })}
+                </span>
+              </div>
+            ))}
+            {waitingTickets.length > 5 && (
+              <p className="text-center text-sm text-muted-foreground pt-2">
+                ...y {waitingTickets.length - 5} más en espera
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       <Dialog open={isRedirectDialogOpen} onOpenChange={setIsRedirectDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
@@ -250,14 +292,14 @@ const TicketManager: React.FC<TicketManagerProps> = ({
               </Select>
             </div>
           </div>
-          <div className="flex justify-end gap-2">
+          <DialogFooter>
             <Button type="button" variant="secondary" onClick={() => setIsRedirectDialogOpen(false)}>
               Cancelar
             </Button>
             <Button type="submit" onClick={handleRedirect}>
               Redirigir
             </Button>
-          </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
