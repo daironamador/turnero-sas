@@ -7,22 +7,49 @@ const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseKey);
 
-// Real-time subscription setup
+// Configuración de suscripciones en tiempo real
 export const setupRealtimeSubscriptions = () => {
-  // Subscribe to tickets table
+  // Suscripción a la tabla tickets
   const ticketsSubscription = supabase
     .channel('tickets-changes')
     .on('postgres_changes', 
       { event: '*', schema: 'public', table: 'tickets' }, 
       payload => {
-        console.log('Tickets change received!', payload);
-        // We'll dispatch events that components will listen to
+        console.log('Cambio en tickets recibido!', payload);
+        // Enviamos eventos que los componentes escucharán
         window.dispatchEvent(new CustomEvent('tickets-updated', { detail: payload }));
       }
     )
     .subscribe();
+    
+  // Suscripción a la tabla servicios
+  const servicesSubscription = supabase
+    .channel('services-changes')
+    .on('postgres_changes', 
+      { event: '*', schema: 'public', table: 'services' }, 
+      payload => {
+        console.log('Cambio en servicios recibido!', payload);
+        window.dispatchEvent(new CustomEvent('services-updated', { detail: payload }));
+      }
+    )
+    .subscribe();
+    
+  // Suscripción a la tabla salas
+  const roomsSubscription = supabase
+    .channel('rooms-changes')
+    .on('postgres_changes', 
+      { event: '*', schema: 'public', table: 'rooms' }, 
+      payload => {
+        console.log('Cambio en salas recibido!', payload);
+        window.dispatchEvent(new CustomEvent('rooms-updated', { detail: payload }));
+      }
+    )
+    .subscribe();
 
+  // Función de limpieza para eliminar las suscripciones
   return () => {
     supabase.removeChannel(ticketsSubscription);
+    supabase.removeChannel(servicesSubscription);
+    supabase.removeChannel(roomsSubscription);
   };
 };

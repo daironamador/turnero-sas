@@ -5,22 +5,26 @@ import { format } from 'date-fns';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Star } from 'lucide-react';
+import { Star, Download } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { printReport } from '@/utils/printUtils';
 
 interface ReportsTableProps {
   tickets: Ticket[];
+  startDate: Date;
+  endDate: Date;
 }
 
-const ReportsTable: React.FC<ReportsTableProps> = ({ tickets }) => {
+const ReportsTable: React.FC<ReportsTableProps> = ({ tickets, startDate, endDate }) => {
   const [searchTerm, setSearchTerm] = useState('');
   
-  // Filter tickets based on search term
+  // Filtrar tickets basados en término de búsqueda
   const filteredTickets = tickets.filter(ticket => {
-    const searchable = `${ticket.ticketNumber} ${ServiceTypeLabels[ticket.serviceType]} ${ticket.status}`.toLowerCase();
+    const searchable = `${ticket.ticketNumber} ${ServiceTypeLabels[ticket.serviceType]} ${ticket.status} ${ticket.patientName || ''}`.toLowerCase();
     return searchable.includes(searchTerm.toLowerCase());
   });
   
-  // Calculate statistics
+  // Calcular estadísticas
   const totalTickets = tickets.length;
   const completedTickets = tickets.filter(t => t.status === 'completed').length;
   const cancelledTickets = tickets.filter(t => t.status === 'cancelled').length;
@@ -28,6 +32,20 @@ const ReportsTable: React.FC<ReportsTableProps> = ({ tickets }) => {
   const waitingTickets = tickets.filter(t => t.status === 'waiting').length;
   const servingTickets = tickets.filter(t => t.status === 'serving').length;
   const vipTickets = tickets.filter(t => t.isVip).length;
+  
+  // Calcular estadísticas por tipo de servicio
+  const serviceStats: Record<string, number> = {};
+  tickets.forEach(ticket => {
+    const serviceType = ticket.serviceType;
+    if (!serviceStats[serviceType]) {
+      serviceStats[serviceType] = 0;
+    }
+    serviceStats[serviceType]++;
+  });
+
+  const handlePrintReport = () => {
+    printReport(tickets, startDate, endDate);
+  };
   
   return (
     <div>
@@ -54,15 +72,33 @@ const ReportsTable: React.FC<ReportsTableProps> = ({ tickets }) => {
             <div className="text-2xl font-bold text-yellow-700">{vipTickets}</div>
           </div>
         </div>
-      </div>
-      
-      <div className="mb-4">
-        <Input 
-          placeholder="Buscar tickets..." 
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="max-w-sm"
-        />
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+          {Object.entries(serviceStats).map(([serviceType, count]) => (
+            <div key={serviceType} className="bg-ocular-50 p-3 rounded-md text-center">
+              <div className="text-sm text-ocular-600">{ServiceTypeLabels[serviceType as any]}</div>
+              <div className="text-2xl font-bold text-ocular-700">{count}</div>
+            </div>
+          ))}
+        </div>
+        
+        <div className="flex justify-between items-center mb-4">
+          <Input 
+            placeholder="Buscar tickets..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="max-w-sm"
+          />
+          
+          <Button 
+            onClick={handlePrintReport}
+            variant="outline" 
+            className="flex items-center"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Imprimir Reporte
+          </Button>
+        </div>
       </div>
       
       <Table>
@@ -72,6 +108,7 @@ const ReportsTable: React.FC<ReportsTableProps> = ({ tickets }) => {
             <TableHead>Ticket #</TableHead>
             <TableHead>Servicio</TableHead>
             <TableHead>Estado</TableHead>
+            <TableHead>Paciente</TableHead>
             <TableHead>Fecha</TableHead>
             <TableHead>Hora Creado</TableHead>
             <TableHead>Hora Llamado</TableHead>
@@ -81,7 +118,7 @@ const ReportsTable: React.FC<ReportsTableProps> = ({ tickets }) => {
         </TableHeader>
         <TableBody>
           {filteredTickets.map((ticket) => {
-            // Calculate wait time
+            // Calcular tiempo de espera
             const waitTimeMinutes = ticket.calledAt && ticket.createdAt 
               ? Math.round((ticket.calledAt.getTime() - ticket.createdAt.getTime()) / (1000 * 60))
               : null;
@@ -128,6 +165,9 @@ const ReportsTable: React.FC<ReportsTableProps> = ({ tickets }) => {
                   )}
                 </TableCell>
                 <TableCell>
+                  {ticket.patientName || '-'}
+                </TableCell>
+                <TableCell>
                   {format(ticket.createdAt, 'dd/MM/yyyy')}
                 </TableCell>
                 <TableCell>
@@ -152,7 +192,7 @@ const ReportsTable: React.FC<ReportsTableProps> = ({ tickets }) => {
           
           {filteredTickets.length === 0 && (
             <TableRow>
-              <TableCell colSpan={8} className="text-center py-4 text-gray-500">
+              <TableCell colSpan={9} className="text-center py-4 text-gray-500">
                 No se encontraron tickets con el término de búsqueda
               </TableCell>
             </TableRow>

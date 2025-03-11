@@ -1,21 +1,46 @@
 
 import { format } from 'date-fns';
 import { Ticket, ServiceTypeLabels, CompanySettings } from '@/lib/types';
+import { supabase } from '@/lib/supabase';
 
-export const printTicket = (ticket: Ticket, companySettings?: CompanySettings) => {
-  // Create a new window for printing
+// Obtener la configuración de la empresa
+const getCompanySettings = async (): Promise<CompanySettings | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('company_settings')
+      .select('*')
+      .limit(1)
+      .single();
+    
+    if (error) {
+      console.error('Error al obtener configuración de la empresa:', error);
+      return null;
+    }
+    
+    return data as CompanySettings;
+  } catch (error) {
+    console.error('Error al obtener configuración de la empresa:', error);
+    return null;
+  }
+};
+
+export const printTicket = async (ticket: Ticket) => {
+  // Obtener la configuración de la empresa
+  const companySettings = await getCompanySettings();
+  
+  // Crear una nueva ventana para imprimir
   const printWindow = window.open('', '', 'width=300,height=600');
   
   if (!printWindow) {
-    alert('Please allow popups for this site to print tickets');
+    alert('Por favor, permita ventanas emergentes para este sitio para imprimir tickets');
     return;
   }
   
-  // Get current date/time
+  // Obtener fecha/hora actual
   const currentDate = format(new Date(), 'dd/MM/yyyy');
   const currentTime = format(new Date(), 'HH:mm:ss');
   
-  // Create print content
+  // Crear contenido para impresión
   printWindow.document.write(`
     <html>
     <head>
@@ -71,6 +96,10 @@ export const printTicket = (ticket: Ticket, companySettings?: CompanySettings) =
           height: auto;
           margin-bottom: 10px;
         }
+        .patient-name {
+          font-size: 12px;
+          margin-bottom: 10px;
+        }
       </style>
     </head>
     <body>
@@ -91,6 +120,8 @@ export const printTicket = (ticket: Ticket, companySettings?: CompanySettings) =
       <div class="ticket-number">#${ticket.ticketNumber}</div>
       <div class="service-type">${ServiceTypeLabels[ticket.serviceType]}</div>
       
+      ${ticket.patientName ? `<div class="patient-name">Paciente: ${ticket.patientName}</div>` : ''}
+      
       <div class="info">
         ${ticket.redirectedFrom ? `<div>Redirigido de: ${ServiceTypeLabels[ticket.redirectedFrom]}</div>` : ''}
       </div>
@@ -102,7 +133,7 @@ export const printTicket = (ticket: Ticket, companySettings?: CompanySettings) =
     </html>
   `);
   
-  // Wait a moment for content to load then print
+  // Esperar un momento para que se cargue el contenido y luego imprimir
   setTimeout(() => {
     printWindow.document.close();
     printWindow.focus();
@@ -111,28 +142,32 @@ export const printTicket = (ticket: Ticket, companySettings?: CompanySettings) =
   }, 500);
 };
 
-export const printReport = (
+export const printReport = async (
   tickets: Ticket[], 
   startDate: Date, 
-  endDate: Date, 
-  companySettings?: CompanySettings
+  endDate: Date
 ) => {
-  // Create a new window for printing
+  // Obtener la configuración de la empresa
+  const companySettings = await getCompanySettings();
+  
+  // Crear una nueva ventana para imprimir
   const printWindow = window.open('', '', 'width=800,height=600');
   
   if (!printWindow) {
-    alert('Please allow popups for this site to print reports');
+    alert('Por favor, permita ventanas emergentes para este sitio para imprimir reportes');
     return;
   }
   
-  // Calculate statistics
+  // Calcular estadísticas
   const totalTickets = tickets.length;
   const completedTickets = tickets.filter(t => t.status === 'completed').length;
   const cancelledTickets = tickets.filter(t => t.status === 'cancelled').length;
   const redirectedTickets = tickets.filter(t => t.status === 'redirected').length;
+  const waitingTickets = tickets.filter(t => t.status === 'waiting').length;
+  const servingTickets = tickets.filter(t => t.status === 'serving').length;
   const vipTickets = tickets.filter(t => t.isVip).length;
   
-  // Group by service type
+  // Agrupar por tipo de servicio
   const serviceStats: Record<string, number> = {};
   tickets.forEach(ticket => {
     const serviceType = ticket.serviceType;
@@ -142,7 +177,7 @@ export const printReport = (
     serviceStats[serviceType]++;
   });
   
-  // Create print content
+  // Crear contenido para impresión
   printWindow.document.write(`
     <html>
     <head>
@@ -262,6 +297,14 @@ export const printReport = (
           <div class="stat-value">${redirectedTickets}</div>
         </div>
         <div class="stat-box">
+          <div class="stat-label">En espera</div>
+          <div class="stat-value">${waitingTickets}</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">En atención</div>
+          <div class="stat-value">${servingTickets}</div>
+        </div>
+        <div class="stat-box">
           <div class="stat-label">VIP</div>
           <div class="stat-value">${vipTickets}</div>
         </div>
@@ -287,8 +330,10 @@ export const printReport = (
             <th>Servicio</th>
             <th>Estado</th>
             <th>VIP</th>
+            <th>Paciente</th>
             <th>Fecha y Hora</th>
             <th>Tiempo Espera</th>
+            <th>Sala</th>
           </tr>
         </thead>
         <tbody>
@@ -309,8 +354,10 @@ export const printReport = (
                   'Redirigido'
                 }</td>
                 <td>${ticket.isVip ? 'Sí' : 'No'}</td>
+                <td>${ticket.patientName || '-'}</td>
                 <td>${format(ticket.createdAt, 'dd/MM/yyyy HH:mm')}</td>
                 <td>${typeof waitTime === 'number' ? `${waitTime} min` : waitTime}</td>
+                <td>${ticket.counterNumber || '-'}</td>
               </tr>
             `;
           }).join('')}

@@ -1,16 +1,16 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { format, subDays, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
+import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
 import { Calendar as CalendarIcon, Printer, Download, RefreshCw, BarChart3, PieChart } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import ReportsTable from '@/components/reports/ReportsTable';
-import { getTicketsReport } from '@/services/ticketService';
+import { getTicketsReport, getReportByPeriod } from '@/services/ticketService';
 import { Ticket } from '@/lib/types';
 import { printReport } from '@/utils/printUtils';
 import { DateRange } from 'react-day-picker';
@@ -27,17 +27,29 @@ const Reports: React.FC = () => {
     to: endOfDay(new Date())
   });
 
+  // Cargar datos automáticamente al iniciar
+  useEffect(() => {
+    fetchReportData();
+  }, []);
+
   const fetchReportData = async () => {
     setLoading(true);
     try {
-      const data = await getTicketsReport(dateRange.from, dateRange.to);
-      setTickets(data);
+      // Usar la función específica para reportes por período
+      if (reportType === 'custom' && customRange?.from) {
+        const data = await getTicketsReport(dateRange.from, dateRange.to);
+        setTickets(data);
+      } else {
+        const data = await getReportByPeriod(reportType);
+        setTickets(data);
+      }
+      
       toast({
         title: "Reporte generado",
-        description: `${data.length} tickets encontrados en el período seleccionado`,
+        description: `${tickets.length} tickets encontrados en el período seleccionado`,
       });
     } catch (error) {
-      console.error('Error fetching report data:', error);
+      console.error('Error al cargar datos del reporte:', error);
       toast({
         title: "Error",
         description: "No se pudo cargar los datos del reporte",
@@ -90,6 +102,14 @@ const Reports: React.FC = () => {
     
     setReportType(value as any);
     setDateRange(newDateRange);
+    
+    // Generar automáticamente el reporte al cambiar de pestaña
+    // excepto en el caso de personalizado que requiere seleccionar fechas
+    if (value !== 'custom') {
+      setTimeout(() => {
+        fetchReportData();
+      }, 100);
+    }
   };
 
   const handlePrintReport = () => {
@@ -178,16 +198,22 @@ const Reports: React.FC = () => {
                 )}
               </div>
               
-              <Button 
-                className="w-full mb-6" 
-                onClick={fetchReportData}
-                disabled={loading}
-              >
-                {loading ? 'Generando reporte...' : 'Generar Reporte'}
-              </Button>
+              {reportType === 'custom' && (
+                <Button 
+                  className="w-full mb-6" 
+                  onClick={fetchReportData}
+                  disabled={loading}
+                >
+                  {loading ? 'Generando reporte...' : 'Generar Reporte'}
+                </Button>
+              )}
               
               {tickets.length > 0 ? (
-                <ReportsTable tickets={tickets} />
+                <ReportsTable 
+                  tickets={tickets} 
+                  startDate={dateRange.from} 
+                  endDate={dateRange.to} 
+                />
               ) : (
                 <div className="text-center py-8 text-gray-500">
                   {loading 

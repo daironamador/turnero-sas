@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -12,7 +12,8 @@ import {
   ArrowRightLeft,
   Star,
   RefreshCw,
-  History
+  History,
+  UserPlus
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
@@ -28,39 +29,14 @@ import {
 } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-
-// Mock data for demonstration
-const mockTickets: Ticket[] = [
-  {
-    id: '1',
-    ticketNumber: 'CG001',
-    serviceType: 'CG',
-    status: 'waiting',
-    createdAt: new Date(new Date().getTime() - 1000 * 60 * 15), // 15 minutes ago
-  },
-  {
-    id: '2',
-    ticketNumber: 'CG002',
-    serviceType: 'CG',
-    status: 'waiting',
-    isVip: true,
-    createdAt: new Date(new Date().getTime() - 1000 * 60 * 10), // 10 minutes ago
-  },
-  {
-    id: '3',
-    ticketNumber: 'RX001',
-    serviceType: 'RX',
-    status: 'waiting',
-    createdAt: new Date(new Date().getTime() - 1000 * 60 * 5), // 5 minutes ago
-  },
-  {
-    id: '4',
-    ticketNumber: 'RR001',
-    serviceType: 'RR',
-    status: 'waiting',
-    createdAt: new Date(new Date().getTime() - 1000 * 60 * 3), // 3 minutes ago
-  },
-];
+import { Input } from "@/components/ui/input";
+import { 
+  getTicketsByStatus, 
+  callTicket, 
+  completeTicket, 
+  cancelTicket, 
+  redirectTicket 
+} from '@/services/ticketService';
 
 interface TicketManagerProps {
   counterNumber?: number;
@@ -68,21 +44,75 @@ interface TicketManagerProps {
 
 const TicketManager: React.FC<TicketManagerProps> = ({ counterNumber = 1 }) => {
   const { toast } = useToast();
-  const [tickets, setTickets] = useState<Ticket[]>(mockTickets);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
   const [currentTicket, setCurrentTicket] = useState<Ticket | null>(null);
   const [selectedTab, setSelectedTab] = useState<ServiceType>('CG');
   const [completedTickets, setCompletedTickets] = useState<Ticket[]>([]);
   const [redirectService, setRedirectService] = useState<ServiceType>('CG');
   const [isRedirectDialogOpen, setIsRedirectDialogOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isPatientDialogOpen, setIsPatientDialogOpen] = useState(false);
+  const [patientName, setPatientName] = useState('');
+  const [loading, setLoading] = useState(false);
   
-  const handleCallNext = () => {
-    // First check for VIP tickets
+  // Cargar tickets al iniciar y configurar escucha de tiempo real
+  useEffect(() => {
+    loadTickets();
+    
+    // Escuchar actualizaciones en tiempo real
+    const handleTicketsUpdate = () => {
+      loadTickets();
+    };
+    
+    window.addEventListener('tickets-updated', handleTicketsUpdate);
+    
+    return () => {
+      window.removeEventListener('tickets-updated', handleTicketsUpdate);
+    };
+  }, []);
+  
+  const loadTickets = async () => {
+    setLoading(true);
+    try {
+      // Cargar tickets en espera
+      const waitingTickets = await getTicketsByStatus('waiting');
+      
+      // Cargar ticket en atención para esta ventanilla
+      const servingTickets = await getTicketsByStatus('serving');
+      const myServingTicket = servingTickets.find(t => t.counterNumber === counterNumber);
+      
+      if (myServingTicket) {
+        setCurrentTicket(myServingTicket);
+      }
+      
+      // Cargar tickets completados, cancelados o redirigidos
+      const completedTicketsData = [
+        ...await getTicketsByStatus('completed'),
+        ...await getTicketsByStatus('cancelled'),
+        ...await getTicketsByStatus('redirected')
+      ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      
+      setTickets(waitingTickets);
+      setCompletedTickets(completedTicketsData);
+    } catch (error) {
+      console.error('Error cargando tickets:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo cargar los tickets",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const handleCallNext = async () => {
+    // Primero verificar si hay tickets VIP
     let nextTicket = tickets.find(
       ticket => ticket.serviceType === selectedTab && ticket.status === 'waiting' && ticket.isVip
     );
     
-    // If no VIP tickets, get the next regular ticket
+    // Si no hay tickets VIP, obtener el siguiente ticket regular
     if (!nextTicket) {
       nextTicket = tickets.find(
         ticket => ticket.serviceType === selectedTab && ticket.status === 'waiting'
@@ -97,165 +127,144 @@ const TicketManager: React.FC<TicketManagerProps> = ({ counterNumber = 1 }) => {
       return;
     }
     
-    // Update the current ticket
-    const updatedTicket: Ticket = {
-      ...nextTicket,
-      status: 'serving',
-      calledAt: new Date(),
-      counterNumber,
-    };
+    try {
+      // Si ya hay un ticket en atención, completarlo primero
+      if (currentTicket) {
+        await handleCompleteTicket();
+      }
+      
+      // Llamar al siguiente ticket
+      const updatedTicket = await callTicket(nextTicket.id, counterNumber);
+      
+      // Actualizar la UI
+      setTickets(tickets.filter(t => t.id !== nextTicket!.id));
+      setCurrentTicket(updatedTicket);
+      
+      toast({
+        title: updatedTicket.isVip ? "Ticket VIP llamado" : "Ticket llamado",
+        description: `Llamando ticket ${updatedTicket.ticketNumber} a ventanilla ${counterNumber}`,
+      });
+    } catch (error) {
+      console.error('Error llamando al siguiente ticket:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo llamar al siguiente ticket",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  const handleCompleteTicket = async () => {
+    if (!currentTicket) return;
     
-    // If there's already a current ticket, mark it as completed
+    try {
+      const completedTicket = await completeTicket(currentTicket.id);
+      
+      // Actualizar listas
+      setCompletedTickets([completedTicket, ...completedTickets]);
+      setCurrentTicket(null);
+      
+      toast({
+        title: "Ticket completado",
+        description: `Ticket ${completedTicket.ticketNumber} completado`,
+      });
+    } catch (error) {
+      console.error('Error completando ticket:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo completar el ticket",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  const handleCancelTicket = async () => {
+    if (!currentTicket) return;
+    
+    try {
+      const cancelledTicket = await cancelTicket(currentTicket.id);
+      
+      // Actualizar listas
+      setCompletedTickets([cancelledTicket, ...completedTickets]);
+      setCurrentTicket(null);
+      
+      toast({
+        title: "Ticket cancelado",
+        description: `Ticket ${cancelledTicket.ticketNumber} cancelado`,
+      });
+    } catch (error) {
+      console.error('Error cancelando ticket:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo cancelar el ticket",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  const handleRedirectTicket = async () => {
+    if (!currentTicket) return;
+    
+    try {
+      const { oldTicket, newTicket } = await redirectTicket(
+        currentTicket.id, 
+        redirectService,
+        patientName || currentTicket.patientName
+      );
+      
+      // Actualizar listas
+      setCompletedTickets([oldTicket, ...completedTickets]);
+      setTickets([...tickets, newTicket]);
+      setCurrentTicket(null);
+      
+      toast({
+        title: "Ticket redirigido",
+        description: `Ticket ${oldTicket.ticketNumber} redirigido a ${ServiceTypeLabels[redirectService]}`,
+      });
+      
+      // Cerrar diálogos
+      setIsRedirectDialogOpen(false);
+      setIsPatientDialogOpen(false);
+      setPatientName('');
+    } catch (error) {
+      console.error('Error redirigiendo ticket:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo redirigir el ticket",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  const handleRecallTicket = async (ticket: Ticket) => {
     if (currentTicket) {
-      handleCompleteTicket();
+      // Si ya hay un ticket en atención, completarlo primero
+      await handleCompleteTicket();
     }
     
-    // Update tickets list and set current ticket
-    setTickets(
-      tickets.map(ticket => ticket.id === updatedTicket.id ? updatedTicket : ticket)
-    );
-    setCurrentTicket(updatedTicket);
-    
-    // In a real app, this would trigger a display update or notification sound
-    toast({
-      title: updatedTicket.isVip ? "Ticket VIP llamado" : "Ticket llamado",
-      description: `Llamando ticket ${updatedTicket.ticketNumber} a ventanilla ${counterNumber}`,
-    });
-  };
-  
-  const handleCompleteTicket = () => {
-    if (!currentTicket) return;
-    
-    const completedTicket: Ticket = {
-      ...currentTicket,
-      status: 'completed',
-      completedAt: new Date(),
-    };
-    
-    // Update tickets list
-    setTickets(
-      tickets.map(ticket => ticket.id === completedTicket.id ? completedTicket : ticket)
-    );
-    
-    // Add to completed tickets history
-    setCompletedTickets([completedTicket, ...completedTickets]);
-    
-    // Clear current ticket
-    setCurrentTicket(null);
-    
-    toast({
-      title: "Ticket completado",
-      description: `Ticket ${completedTicket.ticketNumber} completado`,
-    });
-  };
-  
-  const handleCancelTicket = () => {
-    if (!currentTicket) return;
-    
-    const cancelledTicket: Ticket = {
-      ...currentTicket,
-      status: 'cancelled',
-      completedAt: new Date(),
-    };
-    
-    setTickets(
-      tickets.map(ticket => ticket.id === cancelledTicket.id ? cancelledTicket : ticket)
-    );
-    
-    // Add to completed tickets history
-    setCompletedTickets([cancelledTicket, ...completedTickets]);
-    
-    setCurrentTicket(null);
-    
-    toast({
-      title: "Ticket cancelado",
-      description: `Ticket ${cancelledTicket.ticketNumber} cancelado`,
-    });
-  };
-  
-  const handleRedirectTicket = () => {
-    if (!currentTicket) return;
-    
-    const previousTicketNumber = currentTicket.ticketNumber;
-    
-    // Create a new ticket for the redirected service
-    const newTicketNumber = `${redirectService}${previousTicketNumber.substring(2)}`;
-    
-    const redirectedTicket: Ticket = {
-      ...currentTicket,
-      id: crypto.randomUUID(),
-      ticketNumber: newTicketNumber,
-      serviceType: redirectService,
-      status: 'waiting',
-      redirectedFrom: currentTicket.serviceType,
-      previousTicketNumber: previousTicketNumber,
-      calledAt: undefined,
-      counterNumber: undefined,
-      completedAt: undefined,
-    };
-    
-    // Mark the current ticket as redirected
-    const oldTicket: Ticket = {
-      ...currentTicket,
-      status: 'redirected',
-      completedAt: new Date(),
-      redirectedTo: redirectService,
-    };
-    
-    // Update tickets list with both the old and new ticket
-    setTickets([
-      ...tickets.map(ticket => ticket.id === currentTicket.id ? oldTicket : ticket),
-      redirectedTicket
-    ]);
-    
-    // Add to completed tickets history
-    setCompletedTickets([oldTicket, ...completedTickets]);
-    
-    // Clear current ticket
-    setCurrentTicket(null);
-    
-    toast({
-      title: "Ticket redirigido",
-      description: `Ticket ${oldTicket.ticketNumber} redirigido a ${ServiceTypeLabels[redirectService]}`,
-    });
-    
-    // Close the dialog
-    setIsRedirectDialogOpen(false);
-  };
-  
-  const handleRecallTicket = (ticket: Ticket) => {
-    if (currentTicket) {
-      // If there's already a current ticket, handle it first
-      handleCompleteTicket();
+    try {
+      // Volver a llamar al ticket
+      const recalledTicket = await callTicket(ticket.id, counterNumber);
+      
+      // Actualizar listas
+      setCompletedTickets(completedTickets.filter(t => t.id !== ticket.id));
+      setCurrentTicket(recalledTicket);
+      
+      toast({
+        title: "Ticket rellamado",
+        description: `Rellamando ticket ${recalledTicket.ticketNumber} a ventanilla ${counterNumber}`,
+      });
+      
+      // Cerrar diálogo de historial
+      setIsHistoryOpen(false);
+    } catch (error) {
+      console.error('Error rellamando ticket:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo rellamar el ticket",
+        variant: "destructive",
+      });
     }
-    
-    // Create a recalled ticket (similar to the original but with updated status)
-    const recalledTicket: Ticket = {
-      ...ticket,
-      status: 'serving',
-      calledAt: new Date(),
-      counterNumber,
-    };
-    
-    // Update tickets list
-    setTickets([
-      ...tickets.filter(t => t.id !== ticket.id),
-      recalledTicket
-    ]);
-    
-    // Remove from completed tickets
-    setCompletedTickets(completedTickets.filter(t => t.id !== ticket.id));
-    
-    // Set as current ticket
-    setCurrentTicket(recalledTicket);
-    
-    toast({
-      title: "Ticket rellamado",
-      description: `Rellamando ticket ${recalledTicket.ticketNumber} a ventanilla ${counterNumber}`,
-    });
-    
-    // Close history dialog if open
-    setIsHistoryOpen(false);
   };
   
   const getWaitingCount = (serviceType: ServiceType) => {
@@ -281,6 +290,15 @@ const TicketManager: React.FC<TicketManagerProps> = ({ counterNumber = 1 }) => {
         <div className="flex gap-2">
           <Button 
             variant="outline" 
+            onClick={loadTickets}
+            disabled={loading}
+            className="flex items-center"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Actualizar
+          </Button>
+          <Button 
+            variant="outline" 
             onClick={() => setIsHistoryOpen(true)}
             className="flex items-center"
           >
@@ -290,7 +308,7 @@ const TicketManager: React.FC<TicketManagerProps> = ({ counterNumber = 1 }) => {
         </div>
       </div>
       
-      {/* Current ticket being served */}
+      {/* Ticket actualmente en atención */}
       {currentTicket ? (
         <Card className={`${currentTicket.isVip ? 'bg-yellow-50 border-2 border-yellow-500' : 'bg-ocular-50 border-2 border-ocular-600'}`}>
           <CardHeader>
@@ -315,6 +333,11 @@ const TicketManager: React.FC<TicketManagerProps> = ({ counterNumber = 1 }) => {
                 <p className="text-lg text-gray-600">
                   {ServiceTypeLabels[currentTicket.serviceType]}
                 </p>
+                {currentTicket.patientName && (
+                  <p className="text-md text-gray-600 mt-1">
+                    Paciente: {currentTicket.patientName}
+                  </p>
+                )}
                 {currentTicket.redirectedFrom && (
                   <p className="text-sm text-gray-500">
                     Redirigido desde: {ServiceTypeLabels[currentTicket.redirectedFrom]}
@@ -377,6 +400,17 @@ const TicketManager: React.FC<TicketManagerProps> = ({ counterNumber = 1 }) => {
                   }
                 </RadioGroup>
                 
+                <div className="py-2">
+                  <Label htmlFor="patientName">Nombre del Paciente (opcional)</Label>
+                  <Input
+                    id="patientName"
+                    value={patientName}
+                    onChange={(e) => setPatientName(e.target.value)}
+                    placeholder={currentTicket.patientName || "Ingrese el nombre del paciente"}
+                    className="mt-1"
+                  />
+                </div>
+                
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setIsRedirectDialogOpen(false)}>
                     Cancelar
@@ -388,21 +422,94 @@ const TicketManager: React.FC<TicketManagerProps> = ({ counterNumber = 1 }) => {
               </DialogContent>
             </Dialog>
             
+            {!currentTicket.patientName && (
+              <Dialog open={isPatientDialogOpen} onOpenChange={setIsPatientDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button 
+                    variant="outline"
+                    className="border-green-300 text-green-600 hover:bg-green-50 hover:text-green-700"
+                  >
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    Agregar Paciente
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Agregar Datos del Paciente</DialogTitle>
+                    <DialogDescription>
+                      Ingrese el nombre del paciente para el ticket #{currentTicket.ticketNumber}
+                    </DialogDescription>
+                  </DialogHeader>
+                  
+                  <div className="py-4">
+                    <Label htmlFor="patientNameInput">Nombre del Paciente</Label>
+                    <Input
+                      id="patientNameInput"
+                      value={patientName}
+                      onChange={(e) => setPatientName(e.target.value)}
+                      placeholder="Ingrese el nombre completo"
+                      className="mt-1"
+                    />
+                  </div>
+                  
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsPatientDialogOpen(false)}>
+                      Cancelar
+                    </Button>
+                    <Button onClick={async () => {
+                      try {
+                        // Actualizar el ticket con el nombre del paciente
+                        const updatedTicket = await updateTicketStatus(
+                          currentTicket.id,
+                          currentTicket.status,
+                          { patient_name: patientName }
+                        );
+                        
+                        setCurrentTicket(updatedTicket);
+                        setPatientName('');
+                        setIsPatientDialogOpen(false);
+                        
+                        toast({
+                          title: "Datos actualizados",
+                          description: "Nombre del paciente agregado al ticket",
+                        });
+                      } catch (error) {
+                        console.error('Error actualizando datos del paciente:', error);
+                        toast({
+                          title: "Error",
+                          description: "No se pudo actualizar el nombre del paciente",
+                          variant: "destructive",
+                        });
+                      }
+                    }}>
+                      Guardar
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
+            
             <Button 
               variant="outline"
               className="border-orange-300 text-orange-600 hover:bg-orange-50 hover:text-orange-700"
-              onClick={() => {
-                const recalledTicket = { ...currentTicket, calledAt: new Date() };
-                setCurrentTicket(recalledTicket);
-                
-                setTickets(
-                  tickets.map(ticket => ticket.id === recalledTicket.id ? recalledTicket : ticket)
-                );
-                
-                toast({
-                  title: "Ticket rellamado",
-                  description: `Rellamando ticket ${recalledTicket.ticketNumber}`,
-                });
+              onClick={async () => {
+                try {
+                  // Volver a llamar al ticket actual
+                  const recalledTicket = await callTicket(currentTicket.id, counterNumber);
+                  setCurrentTicket(recalledTicket);
+                  
+                  toast({
+                    title: "Ticket rellamado",
+                    description: `Rellamando ticket ${recalledTicket.ticketNumber}`,
+                  });
+                } catch (error) {
+                  console.error('Error rellamando ticket:', error);
+                  toast({
+                    title: "Error",
+                    description: "No se pudo rellamar el ticket",
+                    variant: "destructive",
+                  });
+                }
               }}
             >
               <RefreshCw className="w-4 h-4 mr-2" />
@@ -432,7 +539,7 @@ const TicketManager: React.FC<TicketManagerProps> = ({ counterNumber = 1 }) => {
         </Card>
       )}
       
-      {/* Tabs with waiting tickets by service type */}
+      {/* Pestañas con tickets en espera por tipo de servicio */}
       <Tabs 
         defaultValue="CG" 
         value={selectedTab} 
@@ -470,7 +577,7 @@ const TicketManager: React.FC<TicketManagerProps> = ({ counterNumber = 1 }) => {
                 <Button 
                   className="bg-ocular-600 hover:bg-ocular-700"
                   onClick={handleCallNext}
-                  disabled={getWaitingCount(serviceType) === 0}
+                  disabled={getWaitingCount(serviceType) === 0 || loading}
                 >
                   <ChevronRight className="w-4 h-4 mr-2" />
                   Llamar siguiente
@@ -486,10 +593,10 @@ const TicketManager: React.FC<TicketManagerProps> = ({ counterNumber = 1 }) => {
                   {tickets
                     .filter(ticket => ticket.serviceType === serviceType && ticket.status === 'waiting')
                     .sort((a, b) => {
-                      // First sort by VIP status (VIP tickets first)
+                      // Primero ordenar por estado VIP (tickets VIP primero)
                       if (a.isVip && !b.isVip) return -1;
                       if (!a.isVip && b.isVip) return 1;
-                      // Then by creation time (oldest first)
+                      // Luego por tiempo de creación (más antiguos primero)
                       return a.createdAt.getTime() - b.createdAt.getTime();
                     })
                     .map((ticket) => (
@@ -507,6 +614,11 @@ const TicketManager: React.FC<TicketManagerProps> = ({ counterNumber = 1 }) => {
                           </CardTitle>
                         </CardHeader>
                         <CardContent className="pb-3">
+                          {ticket.patientName && (
+                            <p className="text-sm text-gray-600 mb-1">
+                              Paciente: {ticket.patientName}
+                            </p>
+                          )}
                           {ticket.redirectedFrom && (
                             <p className="text-sm text-gray-600 mb-1">
                               Desde: {ServiceTypeLabels[ticket.redirectedFrom]}
@@ -524,29 +636,33 @@ const TicketManager: React.FC<TicketManagerProps> = ({ counterNumber = 1 }) => {
                                 ? 'border-yellow-200 text-yellow-600 hover:bg-yellow-50' 
                                 : 'border-ocular-200 text-ocular-600 hover:bg-ocular-50'
                             }`}
-                            onClick={() => {
-                              // Mark current ticket as completed if exists
-                              if (currentTicket) {
-                                handleCompleteTicket();
+                            disabled={loading}
+                            onClick={async () => {
+                              try {
+                                // Completar ticket actual si existe
+                                if (currentTicket) {
+                                  await handleCompleteTicket();
+                                }
+                                
+                                // Llamar a este ticket específico
+                                const updatedTicket = await callTicket(ticket.id, counterNumber);
+                                
+                                // Actualizar listas
+                                setTickets(tickets.filter(t => t.id !== ticket.id));
+                                setCurrentTicket(updatedTicket);
+                                
+                                toast({
+                                  title: ticket.isVip ? "Ticket VIP llamado" : "Ticket llamado",
+                                  description: `Llamando ticket ${updatedTicket.ticketNumber} a ventanilla ${counterNumber}`,
+                                });
+                              } catch (error) {
+                                console.error('Error llamando ticket específico:', error);
+                                toast({
+                                  title: "Error",
+                                  description: "No se pudo llamar al ticket",
+                                  variant: "destructive",
+                                });
                               }
-                              
-                              // Call this specific ticket
-                              const updatedTicket: Ticket = {
-                                ...ticket,
-                                status: 'serving',
-                                calledAt: new Date(),
-                                counterNumber,
-                              };
-                              
-                              setTickets(
-                                tickets.map(t => t.id === updatedTicket.id ? updatedTicket : t)
-                              );
-                              setCurrentTicket(updatedTicket);
-                              
-                              toast({
-                                title: ticket.isVip ? "Ticket VIP llamado" : "Ticket llamado",
-                                description: `Llamando ticket ${updatedTicket.ticketNumber} a ventanilla ${counterNumber}`,
-                              });
                             }}
                           >
                             Llamar este ticket
@@ -561,7 +677,7 @@ const TicketManager: React.FC<TicketManagerProps> = ({ counterNumber = 1 }) => {
         ))}
       </Tabs>
       
-      {/* History Dialog */}
+      {/* Diálogo de Historial */}
       <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-auto">
           <DialogHeader>
@@ -605,6 +721,11 @@ const TicketManager: React.FC<TicketManagerProps> = ({ counterNumber = 1 }) => {
                       <p className="text-sm text-gray-600">
                         {ServiceTypeLabels[ticket.serviceType]}
                       </p>
+                      {ticket.patientName && (
+                        <p className="text-sm text-gray-600">
+                          Paciente: {ticket.patientName}
+                        </p>
+                      )}
                       {ticket.redirectedTo && (
                         <p className="text-xs text-blue-600">
                           Redirigido a: {ServiceTypeLabels[ticket.redirectedTo]}
@@ -620,6 +741,7 @@ const TicketManager: React.FC<TicketManagerProps> = ({ counterNumber = 1 }) => {
                       <Button 
                         variant="outline" 
                         className="w-full border-gray-200 text-gray-600 hover:bg-gray-50"
+                        disabled={loading}
                         onClick={() => handleRecallTicket(ticket)}
                       >
                         <RefreshCw className="w-4 h-4 mr-2" />
@@ -635,6 +757,37 @@ const TicketManager: React.FC<TicketManagerProps> = ({ counterNumber = 1 }) => {
       </Dialog>
     </div>
   );
+};
+
+// Función para actualizar estado de ticket con propiedades adicionales
+const updateTicketStatus = async (id: string, status: string, updates: any = {}) => {
+  const { data, error } = await supabase
+    .from('tickets')
+    .update({ status, ...updates })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error al actualizar ticket:', error);
+    throw error;
+  }
+
+  return {
+    id: data.id,
+    ticketNumber: data.ticket_number,
+    serviceType: data.service_type,
+    status: data.status,
+    isVip: data.is_vip,
+    createdAt: new Date(data.created_at),
+    calledAt: data.called_at ? new Date(data.called_at) : undefined,
+    completedAt: data.completed_at ? new Date(data.completed_at) : undefined,
+    counterNumber: data.counter_number,
+    patientName: data.patient_name,
+    redirectedTo: data.redirected_to,
+    redirectedFrom: data.redirected_from,
+    previousTicketNumber: data.previous_ticket_number,
+  };
 };
 
 export default TicketManager;
