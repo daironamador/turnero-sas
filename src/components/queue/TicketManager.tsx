@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useMutation } from "@tanstack/react-query";
 import { 
@@ -9,7 +9,6 @@ import {
   recallTicket
 } from '@/services/ticketService';
 import { Service, Ticket, Room, ServiceType } from '@/lib/types';
-import { useSpeechSynthesis } from './display/useSpeechSynthesis';
 
 // Import our new component files
 import CurrentTicket from './CurrentTicket';
@@ -46,9 +45,19 @@ const TicketManager: React.FC<TicketManagerProps> = ({
 }) => {
   const [isRedirectDialogOpen, setIsRedirectDialogOpen] = useState(false);
   const [selectedService, setSelectedService] = useState<string | undefined>(undefined);
-  const { announceTicket } = useSpeechSynthesis();
+  const [ticketChannel, setTicketChannel] = useState<BroadcastChannel | null>(null);
 
   const nextTicket = waitingTickets.length > 0 ? waitingTickets[0] : undefined;
+
+  // Initialize broadcast channel for cross-window/tab communication
+  useEffect(() => {
+    const channel = new BroadcastChannel('ticket-announcements');
+    setTicketChannel(channel);
+    
+    return () => {
+      channel.close();
+    };
+  }, []);
 
   // Mutations
   const callTicketMutation = useMutation({
@@ -157,8 +166,26 @@ const TicketManager: React.FC<TicketManagerProps> = ({
       }
     }
     
-    // Dispatch a custom event that the Display page can listen for
-    // Note: We're not using announceTicket locally anymore to ensure the audio only plays on Display
+    // Send message via BroadcastChannel to the display page
+    if (ticketChannel) {
+      const ticket = {
+        ...currentTicket,
+        // Ensure we have the latest timestamp for display purposes
+        calledAt: new Date()
+      };
+      
+      console.log("Broadcasting ticket recall:", ticket);
+      
+      ticketChannel.postMessage({
+        type: 'announce-ticket',
+        ticket: ticket,
+        counterName: counterName,
+        redirectedFrom: currentTicket.redirectedFrom,
+        originalRoomName: originalRoomName
+      });
+    }
+    
+    // Also dispatch the custom event for backward compatibility
     const customEvent = new CustomEvent('ticket-recalled', {
       detail: {
         ticketNumber: currentTicket.ticketNumber,
@@ -199,8 +226,25 @@ const TicketManager: React.FC<TicketManagerProps> = ({
           }
         }
         
-        // Dispatch a custom event for the display
-        // Note: We're not using announceTicket locally anymore to ensure the audio only plays on Display
+        // Send via BroadcastChannel
+        if (ticketChannel) {
+          const updatedTicket = {
+            ...ticket,
+            status: 'serving',
+            calledAt: new Date(),
+            counterNumber: counterNumber
+          };
+          
+          ticketChannel.postMessage({
+            type: 'announce-ticket',
+            ticket: updatedTicket,
+            counterName: counterName,
+            redirectedFrom: ticket.redirectedFrom,
+            originalRoomName: originalRoomName
+          });
+        }
+        
+        // Also dispatch custom event for backward compatibility
         const customEvent = new CustomEvent('ticket-recalled', {
           detail: {
             ticketNumber: ticket.ticketNumber,

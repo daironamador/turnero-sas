@@ -143,12 +143,37 @@ export function useTicketUpdates({
       console.info('Ticket recalled event received:', event.detail);
     };
     
+    // Create BroadcastChannel to listen for announcements from Call page
+    const ticketChannel = new BroadcastChannel('ticket-announcements');
+    
+    ticketChannel.onmessage = (event) => {
+      console.log('Received broadcast message in useTicketUpdates:', event.data);
+      
+      if (event.data.type === 'announce-ticket') {
+        const { ticket, counterName, redirectedFrom, originalRoomName } = event.data;
+        
+        if (ticket) {
+          // Update the display with the notification
+          setNewlyCalledTicket(ticket);
+          
+          // Announce the ticket
+          announceTicket(
+            ticket.ticketNumber,
+            counterName,
+            redirectedFrom,
+            originalRoomName
+          );
+        }
+      }
+    };
+    
     // Add event listener for the custom event
     window.addEventListener('ticket-recalled', handleTicketRecalled as EventListener);
     
     return () => {
       supabase.removeChannel(channel);
       window.removeEventListener('ticket-recalled', handleTicketRecalled as EventListener);
+      ticketChannel.close();
     };
   }, [
     queryClient, 

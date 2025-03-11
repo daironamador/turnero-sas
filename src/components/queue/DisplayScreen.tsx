@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import DisplayHeader from './display/DisplayHeader';
 import DisplayFooter from './display/DisplayFooter';
 import TicketNotification from './display/TicketNotification';
@@ -34,6 +34,27 @@ const DisplayScreen: React.FC<DisplayScreenProps> = ({ refreshInterval = 5000 })
     lastAnnounced,
     setLastAnnounced
   });
+  
+  // Listen for broadcast channel messages from other windows
+  useEffect(() => {
+    // Create a BroadcastChannel to receive announcements from Llamada page
+    const ticketChannel = new BroadcastChannel('ticket-announcements');
+    
+    ticketChannel.onmessage = (event) => {
+      console.log("Received broadcast message:", event.data);
+      if (event.data.type === 'announce-ticket') {
+        // When receiving an announcement request, update the display with the new ticket
+        const ticketData = event.data.ticket;
+        if (ticketData) {
+          setNewlyCalledTicket(ticketData);
+        }
+      }
+    };
+    
+    return () => {
+      ticketChannel.close();
+    };
+  }, [setNewlyCalledTicket]);
   
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">

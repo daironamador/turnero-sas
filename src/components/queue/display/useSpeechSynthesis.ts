@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 
 export function useSpeechSynthesis() {
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
@@ -56,7 +56,7 @@ export function useSpeechSynthesis() {
   };
 
   // Function to announce ticket via speech synthesis
-  const announceTicket = (
+  const announceTicket = useCallback((
     ticketNumber: string, 
     counterName: string, 
     redirectedFrom?: string, 
@@ -121,7 +121,9 @@ export function useSpeechSynthesis() {
     console.log(`Saying: "${speech.text}"`);
     
     window.speechSynthesis.speak(speech);
-  };
+    
+    return announcementText;
+  }, [voices]);
 
   return { announceTicket };
 }

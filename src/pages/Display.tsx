@@ -1,9 +1,16 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import DisplayScreen from '@/components/queue/DisplayScreen';
 import { Helmet } from 'react-helmet';
 
 const Display: React.FC = () => {
+  // Add a title-based ID to this page to make it identifiable
+  useEffect(() => {
+    document.title = "Sistema de Turnos - Display";
+    // This helps identify this is the display page for cross-window communication
+    window.name = "ticket-display-screen";
+  }, []);
+
   return (
     <>
       <Helmet>
