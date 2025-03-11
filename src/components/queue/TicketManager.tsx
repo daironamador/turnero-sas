@@ -91,12 +91,12 @@ const TicketManager: React.FC<TicketManagerProps> = ({
     }, {
       onSuccess: () => {
         // After successfully recalling, announce the ticket
-        // Ensure we're using a proper type-safe status by explicitly setting it as a literal
+        // Create a properly typed updated ticket with the correct status
         const updatedTicket: Ticket = {
           ...ticket,
-          status: 'serving' as const, // Fixed type issue with status
+          status: "serving" as const, // Explicitly set as serving with type assertion
           calledAt: new Date(),
-          counterNumber: Number(counterNumber) // Convert to number
+          counterNumber: parseInt(counterNumber) || 0 // Ensure it's a number
         };
         
         announceTicket(updatedTicket, counterName, rooms);

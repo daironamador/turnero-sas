@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+
+import { useEffect, useState, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useSpeechSynthesis } from './useSpeechSynthesis';
@@ -26,6 +27,7 @@ export function useTicketUpdates({
   const queryClient = useQueryClient();
   const { announceTicket } = useSpeechSynthesis();
   const [processingAnnouncement, setProcessingAnnouncement] = useState(false);
+  const announcementTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map());
   
   const processTicketAnnouncement = (
     ticket: Ticket, 
@@ -33,19 +35,30 @@ export function useTicketUpdates({
     redirectedFrom?: string, 
     originalRoomName?: string
   ) => {
-    if (lastAnnounced === ticket.id && Date.now() - (ticket.calledAt?.getTime() || 0) < 3000) {
-      console.log(`Skipping already announced ticket ${ticket.id}`);
+    // Add guard to prevent duplicate announcement if already processing this ticket
+    if (processingAnnouncement && lastAnnounced === ticket.id) {
+      console.log(`Skipping duplicate announcement for ticket ${ticket.id}`);
+      return;
+    }
+
+    // Check if this ticket was recently announced (within the last 3 seconds)
+    if (lastAnnounced === ticket.id && 
+        ticket.calledAt && 
+        (Date.now() - ticket.calledAt.getTime() < 3000)) {
+      console.log(`Skipping recently announced ticket ${ticket.id}`);
       return;
     }
 
     console.log(`Processing announcement for ticket ${ticket.ticketNumber} on display`);
     
+    // Show the ticket on the display
     setNewlyCalledTicket(ticket);
     
     if (counterName) {
       console.log(`Announcing ticket ${ticket.ticketNumber} to ${counterName}`);
       
       setProcessingAnnouncement(true);
+      setLastAnnounced(ticket.id);
       
       try {
         announceTicket(
@@ -54,17 +67,26 @@ export function useTicketUpdates({
           redirectedFrom,
           originalRoomName
         );
+        
+        // Clear any existing timeout for this ticket
+        if (announcementTimeouts.current.has(ticket.id)) {
+          clearTimeout(announcementTimeouts.current.get(ticket.id));
+        }
+        
+        // Set a new timeout to allow this ticket to be announced again after 3 seconds
+        const timeoutId = setTimeout(() => {
+          setProcessingAnnouncement(false);
+          console.log(`Ready to process new announcements after ${ticket.ticketNumber}`);
+        }, 3000);
+        
+        announcementTimeouts.current.set(ticket.id, timeoutId);
       } catch (error) {
         console.error('Error announcing ticket:', error);
-      } finally {
-        setLastAnnounced(ticket.id);
-        
-        setTimeout(() => {
-          setProcessingAnnouncement(false);
-        }, 3000);
+        setProcessingAnnouncement(false);
       }
     } else {
       console.error('Missing room name for announcement');
+      setProcessingAnnouncement(false);
     }
   };
   
@@ -97,11 +119,13 @@ export function useTicketUpdates({
           
           console.log('Received broadcast message in useTicketUpdates:', event.data);
           
-          if (event.data.type === 'announce-ticket' && !processingAnnouncement) {
+          if (event.data.type === 'announce-ticket') {
             const { ticket, counterName, redirectedFrom, originalRoomName } = event.data;
             
-            if (ticket) {
+            if (ticket && counterName) {
               processTicketAnnouncement(ticket, counterName, redirectedFrom, originalRoomName);
+            } else {
+              console.error("Received invalid announcement data:", event.data);
             }
           }
         };
@@ -116,11 +140,18 @@ export function useTicketUpdates({
       console.warn('BroadcastChannel not supported in this browser');
     }
     
+    // Clean up
     return () => {
       supabase.removeChannel(channel);
+      
       if (ticketChannel) {
         ticketChannel.close();
       }
+      
+      // Clear all timeouts
+      announcementTimeouts.current.forEach(timeout => {
+        clearTimeout(timeout);
+      });
     };
   }, [
     queryClient, 
@@ -128,8 +159,7 @@ export function useTicketUpdates({
     announceTicket, 
     setNewlyCalledTicket,
     lastAnnounced,
-    setLastAnnounced,
-    processingAnnouncement
+    setLastAnnounced
   ]);
   
   useEffect(() => {

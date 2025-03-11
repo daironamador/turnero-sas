@@ -1,10 +1,12 @@
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 
 export function useSpeechSynthesis() {
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  
+  const speakingQueue = useRef<string[]>([]);
+  const processingRef = useRef(false);
+
   // Make sure voices are loaded
   useEffect(() => {
     const loadVoices = () => {
@@ -12,6 +14,14 @@ export function useSpeechSynthesis() {
         const availableVoices = window.speechSynthesis.getVoices();
         setVoices(availableVoices);
         console.log("Loaded voices:", availableVoices.length);
+        
+        // Log available Spanish voices
+        const spanishVoices = availableVoices.filter(v => v.lang.includes('es'));
+        if (spanishVoices.length) {
+          console.log("Available Spanish voices:", spanishVoices.map(v => `${v.name} (${v.lang})`).join(', '));
+        } else {
+          console.warn("No Spanish voices found");
+        }
       }
     };
     
@@ -19,14 +29,16 @@ export function useSpeechSynthesis() {
     if (window.speechSynthesis?.onvoiceschanged !== undefined) {
       window.speechSynthesis.onvoiceschanged = loadVoices;
     }
-
+    
     // Ensure speech synthesis is not paused when page visibility changes
     const handleVisibilityChange = () => {
       if (window.speechSynthesis) {
         if (document.hidden) {
           window.speechSynthesis.pause();
+          console.log("Speech synthesis paused due to tab visibility change");
         } else {
           window.speechSynthesis.resume();
+          console.log("Speech synthesis resumed due to tab visibility change");
         }
       }
     };
@@ -37,6 +49,98 @@ export function useSpeechSynthesis() {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
+
+  // Process the speech queue
+  useEffect(() => {
+    const processQueue = () => {
+      if (speakingQueue.current.length > 0 && !processingRef.current && window.speechSynthesis) {
+        processingRef.current = true;
+        const text = speakingQueue.current.shift()!;
+        
+        try {
+          // Cancel any ongoing speech
+          window.speechSynthesis.cancel();
+          
+          const speech = new SpeechSynthesisUtterance(text);
+          speech.volume = 1;
+          speech.rate = 0.9;
+          speech.pitch = 1;
+          
+          // Try to find a Spanish Latin American voice first
+          const latinAmericanVoices = voices.filter(voice => 
+            (voice.lang.includes('es-MX') || 
+             voice.lang.includes('es-419') || 
+             voice.lang.includes('es-US') || 
+             voice.lang.includes('es-CO') || 
+             voice.lang.includes('es-AR'))
+          );
+          
+          // If we find Latin American voices, prioritize female voices
+          if (latinAmericanVoices.length > 0) {
+            const femaleVoice = latinAmericanVoices.find(v => v.name.includes('Female') || v.name.includes('female'));
+            speech.voice = femaleVoice || latinAmericanVoices[0];
+            speech.lang = speech.voice.lang;
+          } else {
+            // Fallback to any Spanish voice, but try to avoid es-ES (Spain) if possible
+            const spanishVoices = voices.filter(voice => 
+              voice.lang.includes('es') && !voice.lang.includes('es-ES')
+            );
+            
+            // If no non-Spain Spanish voices found, use any Spanish voice
+            const availableSpanishVoices = spanishVoices.length > 0 ? 
+              spanishVoices : 
+              voices.filter(voice => voice.lang.includes('es'));
+            
+            if (availableSpanishVoices.length > 0) {
+              const femaleVoice = availableSpanishVoices.find(v => v.name.includes('Female') || v.name.includes('female'));
+              speech.voice = femaleVoice || availableSpanishVoices[0];
+              speech.lang = speech.voice.lang;
+            } else {
+              // Last resort: use default voice but set language to Spanish Latin America
+              speech.lang = 'es-419'; // Spanish Latin America
+            }
+          }
+          
+          console.log(`Using voice: ${speech.voice?.name || 'Default'} (${speech.lang})`);
+          console.log(`Saying: "${speech.text}"`);
+          
+          // Set up speech events to track speaking state
+          speech.onstart = () => {
+            setIsSpeaking(true);
+            console.log("Speech started");
+          };
+          
+          speech.onend = () => {
+            setIsSpeaking(false);
+            console.log("Speech ended");
+            processingRef.current = false;
+            // Continue processing the queue after a short delay
+            setTimeout(processQueue, 300);
+          };
+          
+          speech.onerror = (event) => {
+            console.error("Speech error:", event);
+            setIsSpeaking(false);
+            processingRef.current = false;
+            // Try to continue processing the queue even after an error
+            setTimeout(processQueue, 500);
+          };
+          
+          // Ensure utterance is spoken and not ignored by the browser
+          window.speechSynthesis.speak(speech);
+        } catch (error) {
+          console.error("Error speaking:", error);
+          processingRef.current = false;
+          // Try to continue processing the queue even after an error
+          setTimeout(processQueue, 500);
+        }
+      }
+    };
+    
+    if (speakingQueue.current.length > 0 && !processingRef.current) {
+      processQueue();
+    }
+  }, [voices, speakingQueue.current.length]);
 
   // Format the ticket number to spell out service code letters and format the numeric part
   const formatTicketNumber = (ticketNumber: string): string => {
@@ -88,9 +192,6 @@ export function useSpeechSynthesis() {
       return;
     }
 
-    // Cancel any ongoing speech
-    window.speechSynthesis.cancel();
-    
     const formattedNumber = formatTicketNumber(ticketNumber);
     
     // Construct the announcement text
@@ -103,74 +204,10 @@ export function useSpeechSynthesis() {
       announcementText = `Turno ${formattedNumber}, pasar a ${counterName}`;
     }
     
-    const speech = new SpeechSynthesisUtterance();
-    speech.text = announcementText;
-    speech.volume = 1;
-    speech.rate = 0.9;
-    speech.pitch = 1;
+    console.log(`Queueing announcement: "${announcementText}"`);
     
-    // Try to find a Spanish Latin American voice first - prioritize these specific regions
-    const latinAmericanVoices = voices.filter(voice => 
-      (voice.lang.includes('es-MX') || 
-       voice.lang.includes('es-419') || 
-       voice.lang.includes('es-US') || 
-       voice.lang.includes('es-CO') || 
-       voice.lang.includes('es-AR'))
-    );
-    
-    // If we find Latin American voices, prioritize female voices
-    if (latinAmericanVoices.length > 0) {
-      const femaleVoice = latinAmericanVoices.find(v => v.name.includes('Female') || v.name.includes('female'));
-      speech.voice = femaleVoice || latinAmericanVoices[0];
-      speech.lang = speech.voice.lang;
-    } else {
-      // Fallback to any Spanish voice, but try to avoid es-ES (Spain) if possible
-      const spanishVoices = voices.filter(voice => 
-        voice.lang.includes('es') && !voice.lang.includes('es-ES')
-      );
-      
-      // If no non-Spain Spanish voices found, use any Spanish voice
-      const availableSpanishVoices = spanishVoices.length > 0 ? 
-        spanishVoices : 
-        voices.filter(voice => voice.lang.includes('es'));
-      
-      if (availableSpanishVoices.length > 0) {
-        const femaleVoice = availableSpanishVoices.find(v => v.name.includes('Female') || v.name.includes('female'));
-        speech.voice = femaleVoice || availableSpanishVoices[0];
-        speech.lang = speech.voice.lang;
-      } else {
-        // Last resort: use default voice but set language to Spanish Latin America
-        speech.lang = 'es-419'; // Spanish Latin America
-      }
-    }
-    
-    console.log(`Using voice: ${speech.voice?.name || 'Default'} (${speech.lang})`);
-    console.log(`Saying: "${speech.text}"`);
-    
-    // Set up speech events to track speaking state
-    speech.onstart = () => {
-      setIsSpeaking(true);
-      console.log("Speech started");
-    };
-    
-    speech.onend = () => {
-      setIsSpeaking(false);
-      console.log("Speech ended");
-    };
-    
-    speech.onerror = (event) => {
-      console.error("Speech error:", event);
-      setIsSpeaking(false);
-    };
-    
-    // Ensure utterance is spoken and not ignored by the browser
-    setTimeout(() => {
-      try {
-        window.speechSynthesis.speak(speech);
-      } catch (error) {
-        console.error("Error speaking:", error);
-      }
-    }, 100);
+    // Add to queue and process
+    speakingQueue.current.push(announcementText);
     
     return announcementText;
   }, [voices]);

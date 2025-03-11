@@ -1,11 +1,13 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Room, Ticket } from '@/lib/types';
 
 export function useTicketAnnouncer() {
   const [ticketChannel, setTicketChannel] = useState<BroadcastChannel | null>(null);
   const [announcementQueue, setAnnouncementQueue] = useState<any[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const resendAttemptsRef = useRef<Map<string, number>>(new Map());
+  const maxRetries = 3;
 
   // Initialize broadcast channel for cross-window/tab communication
   useEffect(() => {
@@ -43,6 +45,25 @@ export function useTicketAnnouncer() {
       try {
         ticketChannel.postMessage(nextAnnouncement);
         console.log("Sent announcement from queue:", nextAnnouncement);
+        
+        // Add a resend attempt after 3 seconds if we don't receive acknowledgement
+        const ticketId = nextAnnouncement.ticket?.id;
+        if (ticketId) {
+          const currentAttempts = resendAttemptsRef.current.get(ticketId) || 0;
+          
+          if (currentAttempts < maxRetries) {
+            // Increment the retry counter for this ticket
+            resendAttemptsRef.current.set(ticketId, currentAttempts + 1);
+            
+            // Wait for acknowledgment or resend
+            setTimeout(() => {
+              setAnnouncementQueue(prev => [nextAnnouncement, ...prev]);
+            }, 5000); // Resend after 5 seconds if no acknowledgment
+          } else {
+            console.warn(`Max resend attempts (${maxRetries}) reached for ticket ${ticketId}`);
+            resendAttemptsRef.current.delete(ticketId);
+          }
+        }
       } catch (error) {
         console.error("Failed to send queued announcement:", error);
       }
@@ -97,6 +118,9 @@ export function useTicketAnnouncer() {
       setAnnouncementQueue(prev => [...prev, announcement]);
       return;
     }
+    
+    // Reset retry counter for this ticket
+    resendAttemptsRef.current.set(ticket.id, 0);
     
     try {
       ticketChannel.postMessage(announcement);

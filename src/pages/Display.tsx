@@ -1,33 +1,50 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import DisplayScreen from '@/components/queue/DisplayScreen';
 import { Helmet } from 'react-helmet';
 import { Button } from '@/components/ui/button';
 import { Volume2, VolumeX } from 'lucide-react';
+import { toast } from 'sonner';
 
 const Display: React.FC = () => {
   const [audioEnabled, setAudioEnabled] = useState(false);
+  const audioInitialized = useRef(false);
   
   // Function to request audio permission and initialize speech synthesis
   const initializeAudio = () => {
     if (!window.speechSynthesis) {
       console.warn("Speech synthesis is not supported in this browser");
+      toast.error("Su navegador no soporta la síntesis de voz.");
       return;
     }
     
-    // Create a test utterance to request permission
-    const testUtterance = new SpeechSynthesisUtterance("Test");
-    testUtterance.volume = 0; // Silent test
-    
-    // Try to speak to trigger permission request
-    window.speechSynthesis.speak(testUtterance);
-    
-    // Cancel after a short delay
-    setTimeout(() => {
-      window.speechSynthesis.cancel();
-      setAudioEnabled(true);
-      console.log("Audio initialized successfully");
-    }, 100);
+    try {
+      // Create a test utterance to request permission
+      const testUtterance = new SpeechSynthesisUtterance("Test");
+      testUtterance.volume = 0.1; // Almost silent test
+      testUtterance.onstart = () => {
+        console.log("Audio test started - permissions granted");
+      };
+      testUtterance.onend = () => {
+        console.log("Audio test completed successfully");
+        setAudioEnabled(true);
+        audioInitialized.current = true;
+        toast.success("Audio activado correctamente");
+      };
+      testUtterance.onerror = (e) => {
+        console.error("Audio test failed", e);
+        toast.error("Error al activar el audio. Intente nuevamente.");
+      };
+      
+      // Try to speak to trigger permission request
+      window.speechSynthesis.speak(testUtterance);
+      
+      // Ensure we load the voices
+      window.speechSynthesis.getVoices();
+    } catch (error) {
+      console.error("Failed to initialize audio:", error);
+      toast.error("Error al inicializar el audio");
+    }
   };
   
   // Add a title-based ID to this page to make it identifiable
@@ -48,18 +65,44 @@ const Display: React.FC = () => {
         console.log("BroadcastChannel is supported in this browser");
       } else {
         console.warn("BroadcastChannel is NOT supported in this browser - announcements may not work");
+        toast.warning("Su navegador no soporta BroadcastChannel - los anuncios pueden no funcionar correctamente");
       }
       
       // Check if speech synthesis is supported
       if (window.speechSynthesis) {
         console.log("Speech synthesis is supported in this browser");
         
-        // Initialize voices
-        window.speechSynthesis.getVoices();
+        // Auto-initialize audio if it hasn't been done yet
+        if (!audioInitialized.current) {
+          setTimeout(() => {
+            const autoInit = window.confirm("¿Desea activar los anuncios de voz automáticamente?");
+            if (autoInit) {
+              initializeAudio();
+            }
+          }, 1000);
+        }
       } else {
         console.warn("Speech synthesis is NOT supported in this browser - voice announcements will not work");
+        toast.error("Su navegador no soporta la síntesis de voz - los anuncios de voz no funcionarán");
       }
     }
+
+    // Prevent browser from pausing speech synthesis when tab visibility changes
+    const handleVisibilityChange = () => {
+      if (window.speechSynthesis) {
+        if (document.hidden) {
+          window.speechSynthesis.pause();
+        } else {
+          window.speechSynthesis.resume();
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   return (
