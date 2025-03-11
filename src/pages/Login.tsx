@@ -7,9 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { getCompanySettings } from '@/services/settingsService';
 import { CompanySettings } from '@/lib/types';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Login = () => {
   const [loading, setLoading] = useState(false);
@@ -17,9 +19,11 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<CompanySettings | null>(null);
+  const [rememberMe, setRememberMe] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+  const { setPersistence } = useAuth();
   
   // Get the return URL from location state (if available)
   const from = location.state?.from || '/';
@@ -43,7 +47,7 @@ const Login = () => {
     const checkSession = async () => {
       const { data } = await supabase.auth.getSession();
       if (data.session) {
-        navigate(from);
+        navigate(from, { replace: true });
       }
     };
     
@@ -52,7 +56,7 @@ const Login = () => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session) {
-        navigate(from);
+        navigate(from, { replace: true });
       }
     });
 
@@ -77,8 +81,15 @@ const Login = () => {
       // Sign in with Supabase Auth (prioritize Auth)
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
-        password
+        password,
+        options: {
+          // Set persistence based on the remember me checkbox
+          persistSession: true // Always persist within the browser session
+        }
       });
+      
+      // Apply the remember me setting to control persistence beyond browser session
+      setPersistence(rememberMe);
       
       // If there's an auth error
       if (error) {
@@ -116,7 +127,11 @@ const Login = () => {
                 description: "Hay un problema temporal con la verificación, pero puede continuar usando el sistema.",
                 variant: "default"
               });
-              navigate(from);
+              
+              // Apply the remember me setting
+              setPersistence(rememberMe);
+              
+              navigate(from, { replace: true });
               return;
             }
             throw signUpError;
@@ -125,31 +140,40 @@ const Login = () => {
           // Try to sign in again
           const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({
             email,
-            password
+            password,
+            options: {
+              persistSession: true
+            }
           });
           
           if (retryError) {
             throw retryError;
           }
           
+          // Apply the remember me setting
+          setPersistence(rememberMe);
+          
           toast({
             title: "Inicio de sesión exitoso",
             description: "Bienvenido al sistema",
           });
           
-          navigate(from);
+          navigate(from, { replace: true });
           return;
         }
         
         throw error;
       }
       
+      // Apply the remember me setting
+      setPersistence(rememberMe);
+      
       toast({
         title: "Inicio de sesión exitoso",
         description: "Bienvenido al sistema",
       });
       
-      navigate(from);
+      navigate(from, { replace: true });
     } catch (error: any) {
       console.error('Login error:', error);
       setError(error.message || 'Error al iniciar sesión');
@@ -209,6 +233,16 @@ const Login = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loading}
               />
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="rememberMe" 
+                checked={rememberMe} 
+                onCheckedChange={(checked) => setRememberMe(checked === true)}
+              />
+              <Label htmlFor="rememberMe" className="text-sm font-normal cursor-pointer">
+                Permanecer conectado incluso si cierra el navegador
+              </Label>
             </div>
           </CardContent>
           <CardFooter>

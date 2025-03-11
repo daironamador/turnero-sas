@@ -10,6 +10,8 @@ type AuthContextType = {
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
   userRole: string;
+  setPersistence: (isPersistent: boolean) => void;
+  isPersistent: boolean;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -19,6 +21,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string>('viewer');
+  const [isPersistent, setIsPersistent] = useState<boolean>(() => {
+    // Check if persistence setting exists in localStorage
+    const savedPersistence = localStorage.getItem('auth-persistence');
+    return savedPersistence ? JSON.parse(savedPersistence) : false;
+  });
 
   const refreshUser = async () => {
     try {
@@ -35,10 +42,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const setPersistence = (isPersistent: boolean) => {
+    // Save persistence setting to localStorage
+    localStorage.setItem('auth-persistence', JSON.stringify(isPersistent));
+    setIsPersistent(isPersistent);
+    
+    // Update session persistence in Supabase
+    supabase.auth.setSession({
+      access_token: session?.access_token || '',
+      refresh_token: session?.refresh_token || '',
+    }, {
+      persistSession: isPersistent
+    });
+  };
+
   useEffect(() => {
     const getSession = async () => {
       setLoading(true);
       try {
+        // Configure initial session persistence based on saved preference
+        supabase.auth.setAutoRefreshToken(true);
+        supabase.auth.setSession({
+          access_token: session?.access_token || '',
+          refresh_token: session?.refresh_token || '',
+        }, {
+          persistSession: isPersistent
+        });
+        
         await refreshUser();
       } catch (error) {
         console.error('Error getting session:', error);
@@ -51,6 +81,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
+        console.log('Auth state changed:', _event);
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -68,10 +99,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, [isPersistent]);
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    // Clear persistence setting from localStorage when signing out
+    localStorage.removeItem('auth-persistence');
+    setIsPersistent(false);
   };
 
   const value = {
@@ -80,7 +114,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loading,
     signOut,
     refreshUser,
-    userRole
+    userRole,
+    setPersistence,
+    isPersistent
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
