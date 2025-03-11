@@ -85,9 +85,12 @@ export function useTicketUpdates({
                 }
               }
               
+              // Use the ticket's original number for the announcement
+              const ticketNumberToAnnounce = calledTicket.ticketNumber;
+              
               // Announce the called ticket with redirection info if applicable
               announceTicket(
-                calledTicket.ticketNumber, 
+                ticketNumberToAnnounce, 
                 roomName, 
                 calledTicket.redirectedFrom, 
                 originalRoomName

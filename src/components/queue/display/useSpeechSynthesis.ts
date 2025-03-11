@@ -19,18 +19,38 @@ export function useSpeechSynthesis() {
 
   // Format the ticket number to remove leading zeros and convert to a natural number
   const formatTicketNumber = (ticketNumber: string): string => {
-    // Remove any non-numeric characters first
+    // Extract service code prefix (like CG, RX) and the numeric part
+    const serviceCodeMatch = ticketNumber.match(/^([A-Z]+)(\d+)$/);
+    
+    if (serviceCodeMatch) {
+      const serviceCode = serviceCodeMatch[1]; // e.g., "CG"
+      const numericPart = serviceCodeMatch[2]; // e.g., "001"
+      
+      // Convert numeric part to integer to remove leading zeros
+      const numberValue = parseInt(numericPart, 10);
+      
+      // Spell out the service code letters individually
+      const spellOutServiceCode = serviceCode.split('').join(' ');
+      
+      // Handle specific cases like 100, 200, etc.
+      if (numberValue % 100 === 0 && numberValue <= 900) {
+        const hundreds = numberValue / 100;
+        return `${spellOutServiceCode} ${hundreds === 1 ? "cien" : `${hundreds}cientos`}`;
+      }
+      
+      // Return the service code spelled out + formatted number
+      return `${spellOutServiceCode} ${numberValue.toString()}`;
+    }
+    
+    // Fallback for tickets without a service code prefix
     const numericOnly = ticketNumber.replace(/\D/g, '');
-    // Parse as integer to remove leading zeros
     const numberValue = parseInt(numericOnly, 10);
     
-    // Handle specific cases like 100, 200, etc.
     if (numberValue % 100 === 0 && numberValue <= 900) {
       const hundreds = numberValue / 100;
       return hundreds === 1 ? "cien" : `${hundreds}cientos`;
     }
     
-    // Return the number as a string (already without leading zeros due to parseInt)
     return numberValue.toString();
   };
 

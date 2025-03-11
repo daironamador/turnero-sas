@@ -35,15 +35,15 @@ const TicketNotification: React.FC<TicketNotificationProps> = ({ ticket, rooms }
     }
   }
 
-  // Format ticket number to remove leading zeros
-  const formattedNumber = ticket.ticketNumber ? parseInt(ticket.ticketNumber.replace(/\D/g, ''), 10).toString() : '';
+  // Use the ticket's original number (which is preserved during redirects)
+  const displayNumber = ticket.ticketNumber || '';
 
   return (
     <div className={`text-white p-4 animate-pulse ${ticket.isVip ? 'bg-yellow-500' : 'bg-ocular-500'}`}>
       <div className="container mx-auto flex items-center">
         <Bell className="w-6 h-6 mr-3 animate-bounce" />
         <span className="text-xl font-bold mr-2 flex items-center">
-          Turno {formattedNumber}
+          Turno {displayNumber}
           {ticket.isVip && <Star className="ml-2 h-5 w-5" />}
         </span>
         <span className="text-xl">
