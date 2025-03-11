@@ -7,6 +7,10 @@ import { getCompanySettings } from '@/services/settingsService';
 import { CompanySettings } from '@/lib/types';
 import { useAuth } from '@/contexts/AuthContext';
 
+// Constantes para las claves de localStorage
+const TOKEN_KEY = 'sb-access-token';
+const REFRESH_TOKEN_KEY = 'sb-refresh-token';
+
 export const useLoginState = () => {
   const [loading, setLoading] = useState(false);
   const [sessionLoading, setSessionLoading] = useState(true);
@@ -52,9 +56,9 @@ export const useLoginState = () => {
         }
         
         console.log('Login: No active session, checking localStorage...');
-        // Check localStorage for tokens
-        const storedToken = localStorage.getItem('supabase.auth.token');
-        const storedRefreshToken = localStorage.getItem('supabase.auth.refresh_token');
+        // Check localStorage for tokens using the same keys as in AuthContext
+        const storedToken = localStorage.getItem(TOKEN_KEY);
+        const storedRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
         
         if (storedToken && storedRefreshToken) {
           console.log('Login: Found stored tokens, attempting to restore');
@@ -173,9 +177,9 @@ export const useLoginState = () => {
         const token = data.session.access_token;
         const refreshToken = data.session.refresh_token;
         
-        // Always store in localStorage
-        localStorage.setItem('supabase.auth.token', token);
-        localStorage.setItem('supabase.auth.refresh_token', refreshToken);
+        // Store using the same keys as in AuthContext
+        localStorage.setItem(TOKEN_KEY, token);
+        localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
       }
       
       toast({

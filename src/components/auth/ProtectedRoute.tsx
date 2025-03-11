@@ -10,6 +10,10 @@ interface ProtectedRouteProps {
   allowedRoles?: string[];
 }
 
+// Constantes para las claves de localStorage
+const TOKEN_KEY = 'sb-access-token';
+const REFRESH_TOKEN_KEY = 'sb-refresh-token';
+
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
   children,
   allowedRoles = []
@@ -33,8 +37,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         }
         
         // If no active session, check localStorage and try to restore
-        const storedToken = localStorage.getItem('supabase.auth.token');
-        const storedRefreshToken = localStorage.getItem('supabase.auth.refresh_token');
+        const storedToken = localStorage.getItem(TOKEN_KEY);
+        const storedRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
         
         if (storedToken && storedRefreshToken) {
           console.log('ProtectedRoute: No active session, but found stored tokens, attempting to refresh');
