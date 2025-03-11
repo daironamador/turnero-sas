@@ -8,7 +8,7 @@ type AuthContextType = {
   user: User | null;
   loading: boolean;
   signOut: () => Promise<void>;
-  refreshUser: () => Promise<void>;
+  refreshUser: () => Promise<boolean>; // Updated to return Promise<boolean>
   userRole: string;
   setPersistence: (isPersistent: boolean) => void;
   isPersistent: boolean;

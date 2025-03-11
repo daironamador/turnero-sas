@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -26,10 +25,8 @@ const Login = () => {
   const { toast } = useToast();
   const { setPersistence, refreshUser } = useAuth();
   
-  // Get the return URL from location state (if available)
   const from = location.state?.from || '/';
 
-  // Cargar configuración de la empresa para mostrar el logo
   useEffect(() => {
     const loadSettings = async () => {
       try {
@@ -43,14 +40,12 @@ const Login = () => {
     loadSettings();
   }, []);
 
-  // Check if user is already logged in
   useEffect(() => {
     const checkSession = async () => {
       console.log('Login: Checking for existing session...');
       setSessionLoading(true);
       
       try {
-        // First try supabase session
         const { data: sessionData } = await supabase.auth.getSession();
         
         if (sessionData.session) {
@@ -59,7 +54,6 @@ const Login = () => {
           return;
         }
         
-        // No active session, try to restore from localStorage
         console.log('Login: No active session, checking localStorage...');
         const storedSession = localStorage.getItem('supabase-auth-session');
         
@@ -100,20 +94,16 @@ const Login = () => {
       setLoading(true);
       console.log(`Intentando iniciar sesión con: ${email}`);
       
-      // Sign in with Supabase Auth (prioritize Auth)
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
       });
       
-      // Apply the remember me setting to control persistence beyond browser session
       setPersistence(rememberMe);
       
-      // If there's an auth error
       if (error) {
         console.log('Error de autenticación:', error.message);
         
-        // Check if user exists in the users table but not in auth
         const { data: userData, error: userError } = await supabase
           .from('users')
           .select('*')
@@ -123,7 +113,6 @@ const Login = () => {
         if (!userError && userData && userData.is_active) {
           console.log('El usuario existe en la tabla pero no en auth, intentando registrarlo');
           
-          // Try to create user in auth
           const { error: signUpError } = await supabase.auth.signUp({
             email,
             password,
@@ -139,14 +128,12 @@ const Login = () => {
           
           if (signUpError) {
             if (signUpError.message.includes('email rate limit')) {
-              // Inform user about the situation and allow them to continue
               toast({
                 title: "Advertencia de autenticación",
                 description: "Hay un problema temporal con la verificación, pero puede continuar usando el sistema.",
                 variant: "default"
               });
               
-              // Apply the remember me setting
               setPersistence(rememberMe);
               
               navigate(from, { replace: true });
@@ -155,7 +142,6 @@ const Login = () => {
             throw signUpError;
           }
           
-          // Try to sign in again
           const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({
             email,
             password
@@ -165,7 +151,6 @@ const Login = () => {
             throw retryError;
           }
           
-          // Apply the remember me setting
           setPersistence(rememberMe);
           
           toast({
@@ -180,7 +165,6 @@ const Login = () => {
         throw error;
       }
       
-      // Apply the remember me setting
       setPersistence(rememberMe);
       
       toast({
@@ -197,7 +181,6 @@ const Login = () => {
     }
   };
 
-  // If still checking session, show loading spinner
   if (sessionLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
