@@ -1,9 +1,8 @@
-
-import { initSupabase } from './supabaseInit';
+import supabase from './supabaseInit';
 import { User, AuthError } from '@supabase/supabase-js';
 
-// Initialize Supabase with persistent session storage (only once)
-export const supabase = initSupabase();
+// Export the singleton instance
+export { supabase };
 
 // Function to create a new user
 export const createUser = async (email: string, password: string, userData: any): Promise<{user: User | null, error: AuthError | null}> => {
