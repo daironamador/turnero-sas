@@ -95,7 +95,8 @@ const TicketManager: React.FC<TicketManagerProps> = ({
           ...ticket,
           status: "serving", // This is now correctly typed
           calledAt: new Date(),
-          counterNumber: counterNumber // Use the string directly
+          // Convert counterNumber to string since that's what the Ticket type expects
+          counterNumber: counterNumber
         };
         
         announceTicket(updatedTicket, counterName, rooms);
