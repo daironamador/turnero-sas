@@ -2,7 +2,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
-import { setPersistencePreference as setStoredPersistencePreference, getPersistencePreference } from '@/lib/authUtils';
 import { toast } from 'sonner';
 
 type AuthContextType = {
@@ -12,7 +11,6 @@ type AuthContextType = {
   signOut: () => Promise<void>;
   refreshUser: () => Promise<boolean>; 
   userRole: string;
-  setPersistence: (isPersistent: boolean) => void;
   isPersistent: boolean;
 };
 
@@ -23,7 +21,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string>('viewer');
-  const [isPersistent, setIsPersistent] = useState<boolean>(getPersistencePreference());
+  const [isPersistent, setIsPersistent] = useState<boolean>(true);
 
   const refreshUser = async () => {
     try {
@@ -45,11 +43,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Error refreshing user session:', error);
       return false;
     }
-  };
-
-  const setPersistence = (isPersistent: boolean) => {
-    setStoredPersistencePreference(isPersistent);
-    setIsPersistent(isPersistent);
   };
 
   useEffect(() => {
@@ -103,14 +96,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await supabase.auth.signOut();
       
       toast('Sesión cerrada', {
-        description: 'Has cerrado sesión exitosamente.',
-        position: 'top-center',
+        description: 'Has cerrado sesión exitosamente.'
       });
     } catch (error) {
       console.error('Error signing out:', error);
       toast('Error al cerrar sesión', {
-        description: 'Hubo un problema al cerrar tu sesión.',
-        position: 'top-center'
+        description: 'Hubo un problema al cerrar tu sesión.'
       });
     }
   };
@@ -122,7 +113,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signOut,
     refreshUser,
     userRole,
-    setPersistence,
     isPersistent
   };
 

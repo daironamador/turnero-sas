@@ -2,7 +2,7 @@
 import { initSupabase } from './supabaseInit';
 import { User, AuthError } from '@supabase/supabase-js';
 
-// Initialize Supabase with cookie-based auth
+// Initialize Supabase with persistent session storage
 export const supabase = initSupabase();
 
 // Function to create a new user

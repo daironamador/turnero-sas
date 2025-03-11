@@ -14,11 +14,11 @@ export const useLoginState = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<CompanySettings | null>(null);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true); // Default to true
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  const { setPersistence, refreshUser } = useAuth();
+  const { refreshUser } = useAuth();
   
   const from = location.state?.from || '/';
 
@@ -80,9 +80,6 @@ export const useLoginState = () => {
         password
       });
       
-      // Set persistence based on user preference
-      setPersistence(rememberMe);
-      
       if (error) {
         console.log('Error de autenticación:', error.message);
         
@@ -115,8 +112,6 @@ export const useLoginState = () => {
                 description: "Hay un problema temporal con la verificación, pero puede continuar usando el sistema.",
               });
               
-              setPersistence(rememberMe);
-              
               navigate(from, { replace: true });
               return;
             }
@@ -132,8 +127,6 @@ export const useLoginState = () => {
             throw retryError;
           }
           
-          setPersistence(rememberMe);
-          
           toast({
             title: "Inicio de sesión exitoso",
             description: "Bienvenido al sistema",
@@ -145,8 +138,6 @@ export const useLoginState = () => {
         
         throw error;
       }
-      
-      setPersistence(rememberMe);
       
       toast({
         title: "Inicio de sesión exitoso",
