@@ -11,6 +11,7 @@ export const initSupabase = () => {
     auth: {
       autoRefreshToken: true,
       persistSession: true,
+      storage: localStorage,
       detectSessionInUrl: false
     }
   });

@@ -75,12 +75,10 @@ export const useLoginState = () => {
       setLoading(true);
       console.log(`Intentando iniciar sesión con: ${email}`);
       
-      // The issue was here: persistSession is not a valid property for signInWithPassword options
-      // We need to remove it as Supabase auth is already configured for persistence in supabaseInit.ts
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
-        // No need to specify options here as persistence is configured globally
+        // No need to specify options here as persistence is configured globally in supabaseInit.ts
       });
       
       if (error) {
@@ -93,6 +91,7 @@ export const useLoginState = () => {
         description: "Bienvenido al sistema",
       });
       
+      await refreshUser(); // Make sure we refresh the user info
       navigate(from, { replace: true });
     } catch (error: any) {
       console.error('Login error:', error);

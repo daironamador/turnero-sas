@@ -13,7 +13,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
   allowedRoles = []
 }) => {
-  const { user, loading, refreshUser } = useAuth();
+  const { user, loading, refreshUser, lastRefreshed } = useAuth();
   const location = useLocation();
   const [isCheckingSession, setIsCheckingSession] = useState(true);
 
@@ -21,8 +21,14 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   useEffect(() => {
     const checkSession = async () => {
       try {
-        console.log('ProtectedRoute: Checking session...');
-        await refreshUser();
+        // Only check the session if no user is present or if it's been more than 30 seconds
+        // since the last refresh to reduce unnecessary checks
+        if (!user || (Date.now() - lastRefreshed > 30000)) {
+          console.log('ProtectedRoute: Checking session...');
+          await refreshUser();
+        } else {
+          console.log('ProtectedRoute: Using existing session, skipping refresh check');
+        }
       } catch (error) {
         console.error('ProtectedRoute: Error checking session:', error);
       } finally {
@@ -31,7 +37,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     };
 
     checkSession();
-  }, [refreshUser]);
+  }, [refreshUser, user, lastRefreshed]);
 
   // Allow access to /display without authentication
   if (location.pathname === '/display') {

@@ -12,6 +12,7 @@ type AuthContextType = {
   refreshUser: () => Promise<boolean>; 
   userRole: string;
   isPersistent: boolean;
+  lastRefreshed: number;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -22,10 +23,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string>('viewer');
   const [isPersistent, setIsPersistent] = useState<boolean>(true);
+  // Track when we last refreshed to avoid redundant refreshes
+  const [lastRefreshed, setLastRefreshed] = useState<number>(Date.now());
 
   const refreshUser = async () => {
     try {
+      // If we refreshed in the last 30 seconds, don't refresh again
+      const now = Date.now();
+      if (now - lastRefreshed < 30000) {
+        console.log('Session refresh skipped (refreshed recently)');
+        return !!session;
+      }
+      
       console.log('Refreshing user session...');
+      setLastRefreshed(now);
       
       const { data } = await supabase.auth.getSession();
       
@@ -58,6 +69,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setSession(data.session);
           setUser(data.session.user);
           setUserRole(data.session.user.user_metadata?.role || 'viewer');
+          setLastRefreshed(Date.now());
         } else {
           console.log('No active session found');
         }
@@ -79,6 +91,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (newSession?.user) {
         setUserRole(newSession.user.user_metadata?.role || 'viewer');
+        setLastRefreshed(Date.now());
       } else {
         setUserRole('viewer');
       }
@@ -113,7 +126,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signOut,
     refreshUser,
     userRole,
-    isPersistent
+    isPersistent,
+    lastRefreshed
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

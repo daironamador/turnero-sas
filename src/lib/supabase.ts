@@ -2,7 +2,7 @@
 import { initSupabase } from './supabaseInit';
 import { User, AuthError } from '@supabase/supabase-js';
 
-// Initialize Supabase with persistent session storage
+// Initialize Supabase with persistent session storage (only once)
 export const supabase = initSupabase();
 
 // Function to create a new user
