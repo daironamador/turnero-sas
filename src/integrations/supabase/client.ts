@@ -68,7 +68,8 @@ export const createUser = async (email: string, password: string, userData: any)
             error: {
               name: 'EmailRateLimit',
               message: 'Se ha alcanzado el límite de envío de correos. El usuario fue creado correctamente, pero no se pudo enviar el correo de verificación.' 
-            }
+            },
+            message: 'Se ha alcanzado el límite de envío de correos. El usuario fue creado correctamente, pero no se pudo enviar el correo de verificación.'
           };
         }
         
