@@ -1,8 +1,9 @@
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Bell, Volume2, Star } from 'lucide-react';
 import { Ticket } from '@/lib/types';
 import { Room } from '@/lib/types';
+import { useSpeechSynthesis } from './useSpeechSynthesis';
 
 interface TicketNotificationProps {
   ticket: Ticket | null;
@@ -10,6 +11,9 @@ interface TicketNotificationProps {
 }
 
 const TicketNotification: React.FC<TicketNotificationProps> = ({ ticket, rooms }) => {
+  const { announceTicket } = useSpeechSynthesis();
+  const announcementMade = useRef(false);
+  
   if (!ticket) return null;
 
   console.log("TicketNotification displaying ticket:", ticket);
@@ -40,6 +44,26 @@ const TicketNotification: React.FC<TicketNotificationProps> = ({ ticket, rooms }
 
   // Use the ticket's original number for display
   const displayNumber = ticket.ticketNumber || '';
+
+  // Effect to announce the ticket when it first appears
+  useEffect(() => {
+    if (ticket && !announcementMade.current) {
+      // Announce the ticket using speech synthesis
+      if (ticket.redirectedFrom) {
+        announceTicket(displayNumber, roomName, ticket.redirectedFrom, originalRoomName);
+      } else {
+        announceTicket(displayNumber, roomName);
+      }
+      
+      // Mark that we've announced this ticket
+      announcementMade.current = true;
+      
+      // Reset the flag when the component unmounts
+      return () => {
+        announcementMade.current = false;
+      };
+    }
+  }, [ticket, roomName, displayNumber, originalRoomName, announceTicket]);
 
   return (
     <div className={`text-white p-4 animate-pulse ${ticket.isVip ? 'bg-yellow-500' : 'bg-ocular-500'}`}>
