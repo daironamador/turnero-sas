@@ -1,15 +1,10 @@
 
 import React, { useState } from 'react';
-import { Service, Ticket, Room } from '@/lib/types';
+import { Service, Ticket, Room, ServiceType } from '@/lib/types';
 import { useTicketMutations } from '@/hooks/useTicketMutations';
 import { useTicketAnnouncer } from '@/hooks/useTicketAnnouncer';
 
 // Import our component files
-import CurrentTicket from './CurrentTicket';
-import NextTicket from './NextTicket';
-import TicketQueue from './TicketQueue';
-import RedirectDialog from './RedirectDialog';
-import TicketHistory from './TicketHistory';
 import TicketActions from './TicketActions';
 
 interface TicketManagerProps {
@@ -71,9 +66,13 @@ const TicketManager: React.FC<TicketManagerProps> = ({
 
   const handleRedirect = () => {
     if (!currentTicket || !selectedService) return;
+    
+    // Ensure serviceType is properly typed as ServiceType
+    const serviceTypeValue = selectedService as ServiceType;
+    
     redirectTicketMutation.mutate({ 
       ticketId: currentTicket.id, 
-      serviceType: selectedService as any
+      serviceType: serviceTypeValue
     });
     setIsRedirectDialogOpen(false);
   };
@@ -96,7 +95,7 @@ const TicketManager: React.FC<TicketManagerProps> = ({
           ...ticket,
           status: "serving", // This is now correctly typed
           calledAt: new Date(),
-          counterNumber: parseInt(counterNumber) || 0 // Ensure it's a number
+          counterNumber: counterNumber // Use the string directly
         };
         
         announceTicket(updatedTicket, counterName, rooms);

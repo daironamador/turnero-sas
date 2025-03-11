@@ -7,10 +7,10 @@ import { toast } from 'sonner';
 const Display: React.FC = () => {
   const audioInitialized = useRef(false);
   
-  // Function to auto-initialize speech synthesis
+  // Function to initialize speech synthesis
   const initializeAudio = () => {
     if (!window.speechSynthesis) {
-      console.warn("Speech synthesis is not supported in this browser");
+      console.error("Speech synthesis is not supported in this browser");
       toast.error("Su navegador no soporta la síntesis de voz.");
       return;
     }
@@ -19,34 +19,30 @@ const Display: React.FC = () => {
       // Initialize with a silent utterance to grant permissions
       const testUtterance = new SpeechSynthesisUtterance("");
       testUtterance.volume = 0; // Silent test
-      testUtterance.onstart = () => {
-        console.log("Audio initialized successfully");
-        audioInitialized.current = true;
-      };
-      testUtterance.onend = () => {
-        console.log("Audio test completed successfully");
-      };
-      testUtterance.onerror = (e) => {
-        console.error("Audio initialization failed", e);
-        toast.error("Error al inicializar el audio. Intente recargar la página.");
-      };
       
-      // Speak silently to grant permissions
+      // Force reset speech synthesis to clear any stuck state
+      window.speechSynthesis.cancel();
+      
+      // Test with a small utterance
       window.speechSynthesis.speak(testUtterance);
       
       // Force load voices
-      if (speechSynthesis.onvoiceschanged !== undefined) {
-        speechSynthesis.onvoiceschanged = () => {
-          console.log("Voices loaded:", speechSynthesis.getVoices().length);
-        };
-      }
+      window.speechSynthesis.getVoices();
       
-      // Get voices right away too
-      const voices = speechSynthesis.getVoices();
-      console.log("Initial voices loaded:", voices.length);
+      // Set flag
+      audioInitialized.current = true;
+      console.log("Audio system initialized successfully");
+      
+      // Additional initialization to ensure it's ready
+      setTimeout(() => {
+        if (window.speechSynthesis) {
+          window.speechSynthesis.cancel(); // Make sure queue is clear
+          console.log("Audio system ready for announcements");
+        }
+      }, 1000);
     } catch (error) {
       console.error("Failed to initialize audio:", error);
-      toast.error("Error al inicializar el audio");
+      toast.error("Error al inicializar el audio. Intente recargar la página.");
     }
   };
   
@@ -56,10 +52,9 @@ const Display: React.FC = () => {
     // This helps identify this is the display page for cross-window communication
     window.name = "ticket-display-screen";
     
-    // Ensure we're capturing all messages, including from other devices on the network
     console.log("Display page initialized and ready to receive announcements");
     
-    // Detect if we're running on a server vs. client
+    // Check if we're running on a server vs. client
     const isClient = typeof window !== 'undefined';
     
     if (isClient) {
@@ -75,12 +70,19 @@ const Display: React.FC = () => {
       if (window.speechSynthesis) {
         console.log("Speech synthesis is supported in this browser");
         
-        // Auto-initialize audio immediately
-        if (!audioInitialized.current) {
-          initializeAudio();
-        }
+        // Auto-initialize audio immediately and then again after a timeout
+        // This helps with some browsers that might not initialize correctly the first time
+        initializeAudio();
+        
+        // Try again after a delay to ensure it's properly initialized
+        setTimeout(() => {
+          if (!audioInitialized.current) {
+            console.log("Trying audio initialization again...");
+            initializeAudio();
+          }
+        }, 2000);
       } else {
-        console.warn("Speech synthesis is NOT supported in this browser - voice announcements will not work");
+        console.error("Speech synthesis is NOT supported in this browser - voice announcements will not work");
         toast.error("Su navegador no soporta la síntesis de voz - los anuncios de voz no funcionarán");
       }
     }
@@ -92,6 +94,12 @@ const Display: React.FC = () => {
           window.speechSynthesis.pause();
         } else {
           window.speechSynthesis.resume();
+          
+          // When tab becomes visible again, re-initialize audio
+          if (!window.speechSynthesis.speaking && !window.speechSynthesis.pending) {
+            console.log("Tab visible again - ensuring audio system is ready");
+            window.speechSynthesis.cancel(); // Clear any stuck utterances
+          }
         }
       }
     };

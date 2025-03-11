@@ -7,11 +7,14 @@ export function useSpeechSynthesis() {
   const speakingQueue = useRef<string[]>([]);
   const processingRef = useRef(false);
   const synthesisReadyRef = useRef(false);
-
+  
   // Make sure voices are loaded
   useEffect(() => {
     const loadVoices = () => {
       if (window.speechSynthesis) {
+        // First clear any pending speech
+        window.speechSynthesis.cancel();
+        
         const availableVoices = window.speechSynthesis.getVoices();
         setVoices(availableVoices);
         synthesisReadyRef.current = true;
@@ -27,6 +30,11 @@ export function useSpeechSynthesis() {
       }
     };
     
+    // Reset speech synthesis
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    
     // Initial load attempt
     loadVoices();
     
@@ -35,10 +43,25 @@ export function useSpeechSynthesis() {
       window.speechSynthesis.onvoiceschanged = loadVoices;
     }
     
-    // Reset speech synthesis on load to clear any stuck utterances
-    if (window.speechSynthesis) {
-      window.speechSynthesis.cancel();
-    }
+    // Set up recurring check to ensure synthesis is working
+    const checkSynthesisInterval = setInterval(() => {
+      if (window.speechSynthesis) {
+        // If there are items in queue but nothing is speaking, we may be stuck
+        if (!window.speechSynthesis.speaking && speakingQueue.current.length > 0 && !processingRef.current) {
+          console.log("Speech synthesis queue may be stalled. Processing queue...");
+          processingRef.current = false;
+          setTimeout(processQueue, 100);
+        }
+      }
+    }, 2000);
+    
+    // Reset the speech synthesis periodically to avoid Chrome bugs
+    const resetSynthesisInterval = setInterval(() => {
+      if (window.speechSynthesis && !window.speechSynthesis.speaking && !processingRef.current) {
+        console.log("Periodic speech synthesis reset");
+        window.speechSynthesis.cancel();
+      }
+    }, 10000);
     
     // Ensure speech synthesis is not paused when page visibility changes
     const handleVisibilityChange = () => {
@@ -52,7 +75,9 @@ export function useSpeechSynthesis() {
           
           // Process queue after resuming
           setTimeout(() => {
-            processQueue();
+            if (speakingQueue.current.length > 0) {
+              processQueue();
+            }
           }, 500);
         }
       }
@@ -60,24 +85,21 @@ export function useSpeechSynthesis() {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     
-    // Set up recurring check to ensure synthesis hasn't stalled
-    const checkSynthesisInterval = setInterval(() => {
-      if (window.speechSynthesis && !window.speechSynthesis.speaking && speakingQueue.current.length > 0) {
-        console.log("Speech synthesis may have stalled. Restarting queue processing...");
-        processingRef.current = false;
-        setTimeout(processQueue, 100);
-      }
-    }, 3000);
-    
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       clearInterval(checkSynthesisInterval);
+      clearInterval(resetSynthesisInterval);
     };
   }, []);
 
   // Process the speech queue
   const processQueue = useCallback(() => {
-    if (speakingQueue.current.length > 0 && !processingRef.current && window.speechSynthesis) {
+    if (!window.speechSynthesis) {
+      console.error("Speech synthesis not available");
+      return;
+    }
+    
+    if (speakingQueue.current.length > 0 && !processingRef.current) {
       processingRef.current = true;
       const text = speakingQueue.current.shift()!;
       
@@ -89,7 +111,7 @@ export function useSpeechSynthesis() {
       }
       
       try {
-        // Cancel any ongoing speech
+        // Cancel any ongoing speech to avoid queuing problems
         window.speechSynthesis.cancel();
         
         const speech = new SpeechSynthesisUtterance(text);
@@ -108,7 +130,12 @@ export function useSpeechSynthesis() {
         
         // If we find Latin American voices, prioritize female voices
         if (latinAmericanVoices.length > 0) {
-          const femaleVoice = latinAmericanVoices.find(v => v.name.includes('Female') || v.name.includes('female'));
+          const femaleVoice = latinAmericanVoices.find(v => 
+            v.name.includes('Female') || 
+            v.name.includes('female') || 
+            v.name.includes('Paulina') || 
+            v.name.includes('Rosa')
+          );
           speech.voice = femaleVoice || latinAmericanVoices[0];
           speech.lang = speech.voice.lang;
         } else {
@@ -123,16 +150,21 @@ export function useSpeechSynthesis() {
             voices.filter(voice => voice.lang.includes('es'));
           
           if (availableSpanishVoices.length > 0) {
-            const femaleVoice = availableSpanishVoices.find(v => v.name.includes('Female') || v.name.includes('female'));
+            const femaleVoice = availableSpanishVoices.find(v => 
+              v.name.includes('Female') || 
+              v.name.includes('female') || 
+              v.name.includes('Monica')
+            );
             speech.voice = femaleVoice || availableSpanishVoices[0];
             speech.lang = speech.voice.lang;
           } else {
             // Last resort: use default voice but set language to Spanish Latin America
             speech.lang = 'es-419'; // Spanish Latin America
+            console.log("No Spanish voices found, using default voice with Spanish language");
           }
         }
         
-        console.log(`Speaking (voice: ${speech.voice?.name || 'Default'}, lang: ${speech.lang}): "${speech.text}"`);
+        console.log(`Speaking (voice: ${speech.voice?.name || 'Default'}, lang: ${speech.lang}): "${text}"`);
         
         // Set up speech events to track speaking state
         speech.onstart = () => {
@@ -145,7 +177,11 @@ export function useSpeechSynthesis() {
           console.log("Speech ended");
           processingRef.current = false;
           // Continue processing the queue after a short delay
-          setTimeout(processQueue, 300);
+          setTimeout(() => {
+            if (speakingQueue.current.length > 0) {
+              processQueue();
+            }
+          }, 300);
         };
         
         speech.onerror = (event) => {
@@ -153,21 +189,29 @@ export function useSpeechSynthesis() {
           setIsSpeaking(false);
           processingRef.current = false;
           // Try to continue processing the queue even after an error
-          setTimeout(processQueue, 500);
+          setTimeout(() => {
+            if (speakingQueue.current.length > 0) {
+              processQueue();
+            }
+          }, 500);
         };
         
-        // Ensure utterance is spoken and not ignored by the browser
+        // Ensure utterance is spoken
         window.speechSynthesis.speak(speech);
       } catch (error) {
         console.error("Error speaking:", error);
         processingRef.current = false;
         // Try to continue processing the queue even after an error
-        setTimeout(processQueue, 500);
+        setTimeout(() => {
+          if (speakingQueue.current.length > 0) {
+            processQueue();
+          }
+        }, 500);
       }
     }
   }, [voices]);
 
-  // Format the ticket number to spell out service code letters and format the numeric part
+  // Format the ticket number for better pronunciation
   const formatTicketNumber = (ticketNumber: string): string => {
     // Extract service code prefix (like CG, RX) and the numeric part
     const serviceCodeMatch = ticketNumber.match(/^([A-Z]+)(\d+)$/);
@@ -217,9 +261,12 @@ export function useSpeechSynthesis() {
       return;
     }
     
-    // Initialize speech synthesis if needed
-    if (!synthesisReadyRef.current) {
-      window.speechSynthesis.getVoices();
+    // If speech synthesis is not ready, try to initialize it
+    if (!synthesisReadyRef.current && window.speechSynthesis) {
+      console.log("Speech synthesis not yet ready, initializing...");
+      window.speechSynthesis.cancel(); // Clear any pending speech
+      window.speechSynthesis.getVoices(); // Force voice loading
+      synthesisReadyRef.current = true;
     }
 
     const formattedNumber = formatTicketNumber(ticketNumber);
@@ -245,7 +292,7 @@ export function useSpeechSynthesis() {
     }
     
     return announcementText;
-  }, [voices, processQueue]);
+  }, [processQueue]);
 
   return { announceTicket, isSpeaking };
 }
