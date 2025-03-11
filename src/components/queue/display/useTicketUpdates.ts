@@ -110,39 +110,6 @@ export function useTicketUpdates({
     
     channel.subscribe();
     
-    // Handler for the custom recall event from the Llamada page
-    const handleTicketRecalled = (event: CustomEvent) => {
-      const { ticketNumber, counterName, redirectedFrom, originalRoomName } = event.detail;
-      
-      // Show notification
-      if (roomsQuery.data) {
-        // Create a notification ticket for display
-        const notificationTicket = {
-          id: `recall-${Date.now()}`,
-          ticketNumber: ticketNumber,
-          counterNumber: roomsQuery.data.find((r: any) => r.name === counterName)?.id || "",
-          status: 'serving',
-          serviceType: 'OT' as ServiceType, // Use a valid ServiceType
-          isVip: false,
-          createdAt: new Date(),
-          calledAt: new Date(),
-          redirectedFrom: redirectedFrom
-        } as Ticket;
-        
-        setNewlyCalledTicket(notificationTicket);
-      }
-      
-      // Announce the recalled ticket using the speech synthesis
-      announceTicket(
-        ticketNumber,
-        counterName,
-        redirectedFrom,
-        originalRoomName
-      );
-      
-      console.info('Ticket recalled event received:', event.detail);
-    };
-    
     // Create BroadcastChannel to listen for announcements from Call page
     const ticketChannel = new BroadcastChannel('ticket-announcements');
     
@@ -156,23 +123,30 @@ export function useTicketUpdates({
           // Update the display with the notification
           setNewlyCalledTicket(ticket);
           
+          // Get the correct room name - use provided counterName or find it based on counterNumber
+          let roomNameToUse = counterName;
+          if (!roomNameToUse && ticket.counterNumber && roomsQuery.data) {
+            const room = roomsQuery.data.find((r: any) => r.id === ticket.counterNumber);
+            if (room) {
+              roomNameToUse = room.name;
+            }
+          }
+          
           // Announce the ticket
-          announceTicket(
-            ticket.ticketNumber,
-            counterName,
-            redirectedFrom,
-            originalRoomName
-          );
+          if (roomNameToUse) {
+            announceTicket(
+              ticket.ticketNumber,
+              roomNameToUse,
+              redirectedFrom,
+              originalRoomName
+            );
+          }
         }
       }
     };
     
-    // Add event listener for the custom event
-    window.addEventListener('ticket-recalled', handleTicketRecalled as EventListener);
-    
     return () => {
       supabase.removeChannel(channel);
-      window.removeEventListener('ticket-recalled', handleTicketRecalled as EventListener);
       ticketChannel.close();
     };
   }, [

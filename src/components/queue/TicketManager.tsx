@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useMutation } from "@tanstack/react-query";
@@ -150,7 +151,7 @@ const TicketManager: React.FC<TicketManagerProps> = ({
   };
 
   const handleCallAgain = () => {
-    if (!currentTicket || !counterName) return;
+    if (!currentTicket || !counterName || !ticketChannel) return;
     
     // Find the original room name if this is a redirected ticket
     let originalRoomName: string | undefined;
@@ -166,43 +167,28 @@ const TicketManager: React.FC<TicketManagerProps> = ({
       }
     }
     
-    // Send message via BroadcastChannel to the display page
-    if (ticketChannel) {
-      const ticket = {
-        ...currentTicket,
-        // Ensure we have the latest timestamp for display purposes
-        calledAt: new Date()
-      };
-      
-      console.log("Broadcasting ticket recall:", ticket);
-      
-      ticketChannel.postMessage({
-        type: 'announce-ticket',
-        ticket: ticket,
-        counterName: counterName,
-        redirectedFrom: currentTicket.redirectedFrom,
-        originalRoomName: originalRoomName
-      });
-    }
+    // Send message via BroadcastChannel to the display page - this is the ONLY announcement method we'll use
+    const ticket = {
+      ...currentTicket,
+      // Ensure we have the latest timestamp for display purposes
+      calledAt: new Date()
+    };
     
-    // Also dispatch the custom event for backward compatibility
-    const customEvent = new CustomEvent('ticket-recalled', {
-      detail: {
-        ticketNumber: currentTicket.ticketNumber,
-        counterName: counterName,
-        redirectedFrom: currentTicket.redirectedFrom,
-        originalRoomName: originalRoomName
-      }
+    console.log("Broadcasting ticket recall:", ticket);
+    
+    ticketChannel.postMessage({
+      type: 'announce-ticket',
+      ticket: ticket,
+      counterName: counterName,
+      redirectedFrom: currentTicket.redirectedFrom,
+      originalRoomName: originalRoomName
     });
-    
-    // Dispatch the event to make it available globally
-    window.dispatchEvent(customEvent);
     
     toast.success(`Volviendo a llamar al ticket ${currentTicket.ticketNumber}`);
   };
 
   const handleRecallFromHistory = (ticket: Ticket) => {
-    if (!counterName) {
+    if (!counterName || !ticketChannel) {
       toast.error("No se puede rellamar sin un nombre de sala");
       return;
     }
@@ -226,36 +212,21 @@ const TicketManager: React.FC<TicketManagerProps> = ({
           }
         }
         
-        // Send via BroadcastChannel
-        if (ticketChannel) {
-          const updatedTicket = {
-            ...ticket,
-            status: 'serving',
-            calledAt: new Date(),
-            counterNumber: counterNumber
-          };
-          
-          ticketChannel.postMessage({
-            type: 'announce-ticket',
-            ticket: updatedTicket,
-            counterName: counterName,
-            redirectedFrom: ticket.redirectedFrom,
-            originalRoomName: originalRoomName
-          });
-        }
+        // Only use BroadcastChannel to announce - no custom event
+        const updatedTicket = {
+          ...ticket,
+          status: 'serving',
+          calledAt: new Date(),
+          counterNumber: counterNumber
+        };
         
-        // Also dispatch custom event for backward compatibility
-        const customEvent = new CustomEvent('ticket-recalled', {
-          detail: {
-            ticketNumber: ticket.ticketNumber,
-            counterName: counterName,
-            redirectedFrom: ticket.redirectedFrom,
-            originalRoomName: originalRoomName
-          }
+        ticketChannel.postMessage({
+          type: 'announce-ticket',
+          ticket: updatedTicket,
+          counterName: counterName,
+          redirectedFrom: ticket.redirectedFrom,
+          originalRoomName: originalRoomName
         });
-        
-        // Dispatch the event to make it available globally
-        window.dispatchEvent(customEvent);
       }
     });
   };
