@@ -13,11 +13,12 @@ import {
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 const ProfileButton = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const { toast: uiToast } = useToast();
   const [userInitial, setUserInitial] = useState('U');
 
   useEffect(() => {
@@ -29,18 +30,11 @@ const ProfileButton = () => {
   const handleSignOut = async () => {
     try {
       await signOut();
-      toast({
-        title: "Sesión cerrada",
-        description: "Ha cerrado sesión correctamente",
-      });
+      toast("Ha cerrado sesión correctamente");
       navigate('/login');
     } catch (error) {
       console.error('Error signing out:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo cerrar la sesión",
-        variant: "destructive",
-      });
+      toast("No se pudo cerrar la sesión");
     }
   };
 

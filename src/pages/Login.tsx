@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { getCompanySettings } from '@/services/settingsService';
 import { CompanySettings } from '@/lib/types';
+import { toast } from 'sonner';
 
 const Login = () => {
   const [loading, setLoading] = useState(false);
@@ -19,7 +20,7 @@ const Login = () => {
   const [settings, setSettings] = useState<CompanySettings | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const { toast } = useToast();
+  const { toast: uiToast } = useToast();
   
   // Get the return URL from location state (if available)
   const from = location.state?.from || '/';
@@ -40,10 +41,23 @@ const Login = () => {
 
   // Check if user is already logged in
   useEffect(() => {
+    let mounted = true;
+    
     const checkSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (data.session) {
-        navigate(from);
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Error checking session:', error);
+          return;
+        }
+        
+        if (mounted && data.session) {
+          console.log('User already logged in, redirecting to:', from);
+          navigate(from);
+        }
+      } catch (err) {
+        console.error('Unexpected error checking session:', err);
       }
     };
     
@@ -51,12 +65,14 @@ const Login = () => {
 
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) {
+      if (mounted && session && event === 'SIGNED_IN') {
+        console.log('Auth state changed, user signed in');
         navigate(from);
       }
     });
 
     return () => {
+      mounted = false;
       subscription.unsubscribe();
     };
   }, [navigate, from]);
@@ -111,13 +127,21 @@ const Login = () => {
           if (signUpError) {
             if (signUpError.message.includes('email rate limit')) {
               // Inform user about the situation and allow them to continue
-              toast({
-                title: "Advertencia de autenticación",
-                description: "Hay un problema temporal con la verificación, pero puede continuar usando el sistema.",
-                variant: "default"
+              toast("Advertencia de autenticación: Hay un problema temporal con la verificación, pero puede continuar usando el sistema.");
+              
+              // Force refresh the session to ensure we have valid token
+              await supabase.auth.refreshSession();
+              
+              // Try to sign in again
+              const { error: retryError } = await supabase.auth.signInWithPassword({
+                email,
+                password
               });
-              navigate(from);
-              return;
+              
+              if (!retryError) {
+                navigate(from);
+                return;
+              }
             }
             throw signUpError;
           }
@@ -132,10 +156,7 @@ const Login = () => {
             throw retryError;
           }
           
-          toast({
-            title: "Inicio de sesión exitoso",
-            description: "Bienvenido al sistema",
-          });
+          toast("Inicio de sesión exitoso. Bienvenido al sistema");
           
           navigate(from);
           return;
@@ -144,10 +165,10 @@ const Login = () => {
         throw error;
       }
       
-      toast({
-        title: "Inicio de sesión exitoso",
-        description: "Bienvenido al sistema",
-      });
+      toast("Inicio de sesión exitoso. Bienvenido al sistema");
+      
+      // Ensure session is properly set before navigating
+      await supabase.auth.getSession();
       
       navigate(from);
     } catch (error: any) {

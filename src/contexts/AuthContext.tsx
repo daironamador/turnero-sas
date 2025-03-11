@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
 
 type AuthContextType = {
   session: Session | null;
@@ -29,6 +30,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Set user role from metadata
       if (session?.user) {
         setUserRole(session.user.user_metadata?.role || 'viewer');
+        console.log('Session refreshed successfully:', session.user.email);
       }
     } catch (error) {
       console.error('Error getting session:', error);
@@ -49,8 +51,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     getSession();
 
+    // Setup subscription to auth changes with persistent session handling
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      async (event, session) => {
+        console.log('Auth state changed:', event, session?.user?.email);
+        
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -61,17 +66,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUserRole('viewer');
         }
         
+        // Handle token refresh errors
+        if (event === 'TOKEN_REFRESHED') {
+          console.log('Token refreshed successfully');
+        } else if (event === 'SIGNED_OUT') {
+          console.log('User signed out');
+        }
+        
         setLoading(false);
       }
     );
 
+    // Setup a periodic session check to prevent unexpected logouts
+    const sessionCheckInterval = setInterval(async () => {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) {
+        console.error('Session check error:', error);
+      } else if (data.session === null && session !== null) {
+        // Session was lost unexpectedly
+        console.warn('Session lost unexpectedly, attempting to recover');
+        await refreshUser();
+      }
+    }, 5 * 60 * 1000); // Check every 5 minutes
+
     return () => {
       subscription.unsubscribe();
+      clearInterval(sessionCheckInterval);
     };
   }, []);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+      toast('Sesión cerrada correctamente');
+    } catch (error) {
+      console.error('Error signing out:', error);
+      toast('Error al cerrar sesión');
+    }
   };
 
   const value = {

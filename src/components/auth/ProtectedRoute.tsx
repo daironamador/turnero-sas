@@ -2,6 +2,7 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { useEffect } from 'react';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -12,8 +13,20 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
   allowedRoles = []
 }) => {
-  const { user, loading } = useAuth();
+  const { user, loading, refreshUser } = useAuth();
   const location = useLocation();
+
+  // Attempt to refresh the user session when the component mounts
+  useEffect(() => {
+    const checkAndRefreshSession = async () => {
+      if (!user && !loading) {
+        console.log('No user found, attempting to refresh session');
+        await refreshUser();
+      }
+    };
+    
+    checkAndRefreshSession();
+  }, [user, loading, refreshUser]);
 
   // Allow access to /display without authentication
   if (location.pathname === '/display') {
@@ -31,6 +44,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   // If user is not logged in, redirect to login page with return URL
   if (!user) {
+    console.log('User not authenticated, redirecting to login');
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
 
@@ -38,6 +52,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   if (allowedRoles.length > 0) {
     // Get user role from auth metadata
     const userRole = user.user_metadata?.role || 'viewer';
+    console.log('Checking user role:', userRole, 'against allowed roles:', allowedRoles);
 
     // Check if user has the required role
     if (!allowedRoles.includes(userRole)) {
