@@ -2,8 +2,6 @@ import React, { useState } from 'react';
 import { Service, Ticket, Room, ServiceType } from '@/lib/types';
 import { useTicketMutations } from '@/hooks/useTicketMutations';
 import { useTicketAnnouncer } from '@/hooks/useTicketAnnouncer';
-
-// Import our component files
 import TicketActions from './TicketActions';
 
 interface TicketManagerProps {
@@ -30,7 +28,6 @@ const TicketManager: React.FC<TicketManagerProps> = ({
 
   const nextTicket = waitingTickets.length > 0 ? waitingTickets[0] : undefined;
   
-  // Use our custom hooks
   const { announceTicket } = useTicketAnnouncer();
   const {
     callTicketMutation,
@@ -40,7 +37,6 @@ const TicketManager: React.FC<TicketManagerProps> = ({
     recallTicketMutation
   } = useTicketMutations(counterNumber, onTicketChange);
 
-  // Handler functions
   const handleCallNext = () => {
     if (!nextTicket) return;
     callTicketMutation.mutate({ 
@@ -66,7 +62,6 @@ const TicketManager: React.FC<TicketManagerProps> = ({
   const handleRedirect = () => {
     if (!currentTicket || !selectedService) return;
     
-    // Ensure serviceType is properly typed as ServiceType
     const serviceTypeValue = selectedService as ServiceType;
     
     redirectTicketMutation.mutate({ 
@@ -88,17 +83,11 @@ const TicketManager: React.FC<TicketManagerProps> = ({
       ticket 
     }, {
       onSuccess: () => {
-        // After successfully recalling, announce the ticket
-        // Create a properly typed updated ticket with the correct status
-        const updatedTicket: Ticket = {
+        announceTicket({
           ...ticket,
-          status: "serving", // This is now correctly typed
-          calledAt: new Date(),
-          // Need to parse counterNumber as a number as the Ticket type expects
-          counterNumber: parseInt(counterNumber)
-        };
-        
-        announceTicket(updatedTicket, counterName, rooms);
+          counterNumber: parseInt(counterNumber),
+          status: "serving"
+        }, counterName, rooms);
       }
     });
   };
