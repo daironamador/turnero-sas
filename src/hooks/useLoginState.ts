@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
@@ -74,14 +75,12 @@ export const useLoginState = () => {
       setLoading(true);
       console.log(`Intentando iniciar sesión con: ${email}`);
       
+      // The issue was here: persistSession is not a valid property for signInWithPassword options
+      // We need to remove it as Supabase auth is already configured for persistence in supabaseInit.ts
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
-        password,
-        options: {
-          // Always use persistSession: true to keep the session active
-          // even if the browser is closed or refreshed
-          persistSession: true
-        }
+        password
+        // No need to specify options here as persistence is configured globally
       });
       
       if (error) {
