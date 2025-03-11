@@ -52,10 +52,10 @@ export const useLoginState = () => {
         }
         
         console.log('Login: No active session, checking localStorage and sessionStorage...');
-        // Try localStorage first
-        const storedSession = localStorage.getItem('supabase-auth-session');
-        // Also check sessionStorage as an alternative
-        const sessionStorageSession = sessionStorage.getItem('supabase-auth-session');
+        // Try localStorage first (for "remember me")
+        const storedSession = localStorage.getItem('supabase.auth.token');
+        // Also check sessionStorage as an alternative (for current session only)
+        const sessionStorageSession = sessionStorage.getItem('supabase.auth.token');
         
         if (storedSession || sessionStorageSession) {
           console.log('Login: Found stored session, attempting to restore');
@@ -100,6 +100,7 @@ export const useLoginState = () => {
         password
       });
       
+      // Set persistence based on user preference
       setPersistence(rememberMe);
       
       if (error) {
@@ -168,9 +169,20 @@ export const useLoginState = () => {
       
       setPersistence(rememberMe);
       
-      // Also store session in sessionStorage for immediate browser session
+      // Store session token explicitly to both storage mechanisms
       if (data && data.session) {
-        sessionStorage.setItem('supabase-auth-session', JSON.stringify(data.session));
+        const token = data.session.access_token;
+        const refreshToken = data.session.refresh_token;
+        
+        // Store in sessionStorage (temporary, cleared when tab is closed)
+        sessionStorage.setItem('supabase.auth.token', token);
+        sessionStorage.setItem('supabase.auth.refresh_token', refreshToken);
+        
+        // If remember me is checked, also store in localStorage (persistent)
+        if (rememberMe) {
+          localStorage.setItem('supabase.auth.token', token);
+          localStorage.setItem('supabase.auth.refresh_token', refreshToken);
+        }
       }
       
       toast({
