@@ -62,7 +62,7 @@ export interface Ticket {
   createdAt: Date;
   calledAt?: Date;
   completedAt?: Date;
-  counterNumber?: number;
+  counterNumber?: string | number; // Update to accept both string and number
   patientName?: string;
   redirectedTo?: ServiceType;
   redirectedFrom?: ServiceType;

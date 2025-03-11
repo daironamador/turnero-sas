@@ -17,7 +17,8 @@ const TicketNotification: React.FC<TicketNotificationProps> = ({ ticket, rooms }
   // Find room name safely
   let roomName = `sala ${ticket.counterNumber}`;
   if (rooms && ticket.counterNumber) {
-    const room = rooms.find(r => r.id === ticket.counterNumber);
+    // Find the room that matches either the string or number ID
+    const room = rooms.find(r => r.id === ticket.counterNumber || r.id === String(ticket.counterNumber));
     if (room) {
       roomName = room.name;
     }

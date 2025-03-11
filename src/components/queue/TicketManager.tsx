@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Service, Ticket, Room, ServiceType } from '@/lib/types';
 import { useTicketMutations } from '@/hooks/useTicketMutations';
@@ -95,8 +94,8 @@ const TicketManager: React.FC<TicketManagerProps> = ({
           ...ticket,
           status: "serving", // This is now correctly typed
           calledAt: new Date(),
-          // Convert counterNumber to string since that's what the Ticket type expects
-          counterNumber: counterNumber
+          // Need to parse counterNumber as a number as the Ticket type expects
+          counterNumber: parseInt(counterNumber)
         };
         
         announceTicket(updatedTicket, counterName, rooms);
