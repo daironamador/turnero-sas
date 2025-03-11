@@ -66,7 +66,11 @@ const Login = () => {
       // Sign in with Supabase Auth
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
-        password
+        password,
+        options: {
+          // Set persistence based on stayLoggedIn preference
+          persistSession: stayLoggedIn
+        }
       });
       
       // If there's an auth error
