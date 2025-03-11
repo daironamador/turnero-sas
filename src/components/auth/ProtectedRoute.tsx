@@ -32,9 +32,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
           return;
         }
         
-        // If no active session, check localStorage and try to restore
+        // If no active session, check localStorage and sessionStorage and try to restore
         const storedSession = localStorage.getItem('supabase-auth-session');
-        if (storedSession) {
+        const sessionStorageSession = sessionStorage.getItem('supabase-auth-session');
+        
+        if (storedSession || sessionStorageSession) {
           console.log('ProtectedRoute: No active session, but found stored session, attempting to refresh');
           const refreshed = await refreshUser();
           console.log('ProtectedRoute: Session refresh result:', refreshed);

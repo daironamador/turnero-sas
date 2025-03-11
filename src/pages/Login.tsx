@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -54,14 +55,17 @@ const Login = () => {
           return;
         }
         
-        console.log('Login: No active session, checking localStorage...');
+        console.log('Login: No active session, checking localStorage and sessionStorage...');
+        // Try localStorage first
         const storedSession = localStorage.getItem('supabase-auth-session');
+        // Also check sessionStorage as an alternative
+        const sessionStorageSession = sessionStorage.getItem('supabase-auth-session');
         
-        if (storedSession) {
+        if (storedSession || sessionStorageSession) {
           console.log('Login: Found stored session, attempting to restore');
-          const restored = await refreshUser();
+          const success = await refreshUser();
           
-          if (restored) {
+          if (success) {
             console.log('Login: Session restored successfully, redirecting to:', from);
             navigate(from, { replace: true });
             return;
@@ -166,6 +170,11 @@ const Login = () => {
       }
       
       setPersistence(rememberMe);
+      
+      // Also store session in sessionStorage for immediate browser session
+      if (data && data.session) {
+        sessionStorage.setItem('supabase-auth-session', JSON.stringify(data.session));
+      }
       
       toast({
         title: "Inicio de sesión exitoso",
