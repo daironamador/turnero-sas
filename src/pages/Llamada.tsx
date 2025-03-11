@@ -93,10 +93,7 @@ const Llamada: React.FC = () => {
       }
     } catch (error) {
       console.error('Error fetching current ticket:', error);
-      toast({
-        description: "Error al cargar el ticket actual",
-        variant: "destructive"
-      });
+      toast.error("Error al cargar el ticket actual");
     }
   };
 

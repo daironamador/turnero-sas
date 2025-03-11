@@ -61,68 +61,48 @@ const TicketManager: React.FC<TicketManagerProps> = ({
 
   // Mutations
   const callTicketMutation = useMutation({
-    mutationFn: ({ ticketId, counterNumber }: CallTicketParams) => 
-      callTicket(ticketId, counterNumber),
+    mutationFn: (params: CallTicketParams) => 
+      callTicket(params.ticketId, params.counterNumber),
     onSuccess: () => {
-      toast({
-        description: `Se ha llamado al ticket ${currentTicket?.ticketNumber} en el counter ${counterNumber}`,
-      });
+      toast(`Se ha llamado al ticket ${currentTicket?.ticketNumber} en el counter ${counterNumber}`);
       onTicketChange();
     },
     onError: (error: any) => {
-      toast({
-        description: error.message || "No se pudo llamar al ticket",
-        variant: "destructive",
-      });
+      toast.error(error.message || "No se pudo llamar al ticket");
     },
   });
 
   const completeTicketMutation = useMutation({
-    mutationFn: ({ ticketId }: CompleteTicketParams) => completeTicket(ticketId),
+    mutationFn: (params: CompleteTicketParams) => completeTicket(params.ticketId),
     onSuccess: () => {
-      toast({
-        description: `Se ha completado el ticket ${currentTicket?.ticketNumber}`,
-      });
+      toast(`Se ha completado el ticket ${currentTicket?.ticketNumber}`);
       onTicketChange();
     },
     onError: (error: any) => {
-      toast({
-        description: error.message || "No se pudo completar el ticket",
-        variant: "destructive",
-      });
+      toast.error(error.message || "No se pudo completar el ticket");
     },
   });
 
   const cancelTicketMutation = useMutation({
-    mutationFn: ({ ticketId }: CancelTicketParams) => cancelTicket(ticketId),
+    mutationFn: (params: CancelTicketParams) => cancelTicket(params.ticketId),
     onSuccess: () => {
-      toast({
-        description: `Se ha cancelado el ticket ${currentTicket?.ticketNumber}`,
-      });
+      toast(`Se ha cancelado el ticket ${currentTicket?.ticketNumber}`);
       onTicketChange();
     },
     onError: (error: any) => {
-      toast({
-        description: error.message || "No se pudo cancelar el ticket",
-        variant: "destructive",
-      });
+      toast.error(error.message || "No se pudo cancelar el ticket");
     },
   });
 
   const redirectTicketMutation = useMutation({
-    mutationFn: ({ ticketId, serviceType }: RedirectTicketParams) => 
-      redirectTicket(ticketId, serviceType as ServiceType),
+    mutationFn: (params: RedirectTicketParams) => 
+      redirectTicket(params.ticketId, params.serviceType),
     onSuccess: () => {
-      toast({
-        description: `Se ha redirigido el ticket ${currentTicket?.ticketNumber} al servicio ${selectedService}`,
-      });
+      toast(`Se ha redirigido el ticket ${currentTicket?.ticketNumber} al servicio ${selectedService}`);
       onTicketChange();
     },
     onError: (error: any) => {
-      toast({
-        description: error.message || "No se pudo redirigir el ticket",
-        variant: "destructive",
-      });
+      toast.error(error.message || "No se pudo redirigir el ticket");
     },
   });
 
