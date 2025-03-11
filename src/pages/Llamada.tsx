@@ -7,9 +7,12 @@ import { useQuery } from '@tanstack/react-query';
 import { getTicketsByStatus } from '@/services/ticketService';
 import { Room, Service, Ticket } from '@/lib/types';
 import { toast } from 'sonner';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { PhoneCall } from 'lucide-react';
 
 const Llamada: React.FC = () => {
-  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
+  const [selectedRoom, setSelectedRoom] = useState<(Room & { service: Service }) | null>(null);
   const [currentTicket, setCurrentTicket] = useState<Ticket | undefined>(undefined);
   
   // Fetch waiting tickets
@@ -18,20 +21,20 @@ const Llamada: React.FC = () => {
     queryFn: async () => getTicketsByStatus('waiting'),
   });
 
-  // Fetch rooms
+  // Fetch rooms with their services
   const roomsQuery = useQuery({
     queryKey: ['rooms'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('rooms')
-        .select('*, services:service_id(id, code, name)')
+        .select('*, service:service_id(id, code, name)')
         .eq('is_active', true);
       
       if (error) {
         throw error;
       }
       
-      return data as (Room & { services: Service })[];
+      return data as (Room & { service: Service })[];
     },
   });
 
@@ -116,6 +119,13 @@ const Llamada: React.FC = () => {
     };
   }, []);
 
+  // Auto-select the first room when data loads
+  useEffect(() => {
+    if (roomsQuery.data && roomsQuery.data.length > 0 && !selectedRoom) {
+      setSelectedRoom(roomsQuery.data[0]);
+    }
+  }, [roomsQuery.data]);
+
   // Check for loading or error states
   if (waitingTicketsQuery.isLoading || roomsQuery.isLoading || servicesQuery.isLoading) {
     return (
@@ -137,48 +147,74 @@ const Llamada: React.FC = () => {
     );
   }
 
+  const roomsByService = roomsQuery.data?.reduce((acc, room) => {
+    const serviceCode = room.service.code;
+    if (!acc[serviceCode]) {
+      acc[serviceCode] = [];
+    }
+    acc[serviceCode].push(room);
+    return acc;
+  }, {} as Record<string, (Room & { service: Service })[]>);
+
   return (
     <MainLayout>
-      <div className="mb-4 flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Llamada de Tickets</h1>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">Sala:</span>
-          <select 
-            className="border rounded px-2 py-1 bg-background"
-            value={selectedRoom?.id || ""}
-            onChange={(e) => {
-              const roomId = e.target.value;
-              const room = roomsQuery.data?.find(r => r.id === roomId);
-              setSelectedRoom(room || null);
-            }}
-          >
-            <option value="">Seleccionar Sala</option>
-            {roomsQuery.data?.map(room => (
-              <option key={room.id} value={room.id}>
-                {room.name} ({room.number})
-              </option>
-            ))}
-          </select>
-        </div>
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold flex items-center">
+          <PhoneCall className="mr-2 h-6 w-6 text-primary" />
+          Llamada de Tickets
+        </h1>
       </div>
       
-      {selectedRoom ? (
-        <TicketManager 
-          currentTicket={currentTicket}
-          waitingTickets={waitingTicketsQuery.data?.filter(
-            ticket => ticket.serviceType === selectedRoom.services.code
-          ) || []}
-          rooms={roomsQuery.data || []}
-          services={servicesQuery.data || []}
-          counterNumber={selectedRoom.id}
-          counterName={selectedRoom.name}
-          onTicketChange={handleTicketChange}
-        />
-      ) : (
-        <div className="rounded-md border p-4 text-center">
-          <p className="text-muted-foreground">Por favor seleccione una sala para comenzar</p>
-        </div>
-      )}
+      <div className="bg-white rounded-lg shadow-md overflow-hidden">
+        <Tabs defaultValue={selectedRoom?.id} onValueChange={(value) => {
+          const room = roomsQuery.data?.find(r => r.id === value);
+          if (room) setSelectedRoom(room);
+        }}>
+          <div className="bg-muted/50 p-1 border-b">
+            <TabsList className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 w-full h-auto bg-transparent gap-1">
+              {roomsQuery.data?.map(room => (
+                <TabsTrigger 
+                  key={room.id} 
+                  value={room.id}
+                  className="py-2 px-3 data-[state=active]:bg-white data-[state=active]:shadow-md flex-col items-center justify-center h-full"
+                >
+                  <div className="font-medium">{room.name}</div>
+                  <div className="text-xs text-muted-foreground mt-1">{room.service.name}</div>
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </div>
+          
+          {roomsQuery.data?.map(room => (
+            <TabsContent key={room.id} value={room.id} className="mt-0 p-4">
+              {selectedRoom && (
+                <div className="mb-4">
+                  <div className="flex justify-between items-center mb-4">
+                    <div>
+                      <h2 className="text-xl font-semibold">{selectedRoom.name}</h2>
+                      <p className="text-muted-foreground">
+                        Servicio: <Badge variant="outline">{selectedRoom.service.name}</Badge>
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <TicketManager 
+                    currentTicket={currentTicket}
+                    waitingTickets={waitingTicketsQuery.data?.filter(
+                      ticket => ticket.serviceType === selectedRoom.service.code
+                    ) || []}
+                    rooms={roomsQuery.data || []}
+                    services={servicesQuery.data || []}
+                    counterNumber={selectedRoom.id}
+                    counterName={selectedRoom.name}
+                    onTicketChange={handleTicketChange}
+                  />
+                </div>
+              )}
+            </TabsContent>
+          ))}
+        </Tabs>
+      </div>
     </MainLayout>
   );
 };
