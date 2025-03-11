@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabase';
 import { ServiceType, Ticket } from '@/lib/types';
 import { format } from 'date-fns';
@@ -207,6 +206,41 @@ export const redirectTicket = async (
     oldTicket: mapDatabaseTicketToTicket(updatedTicket),
     newTicket: mapDatabaseTicketToTicket(createdTicket)
   };
+};
+
+// Recall a previously completed/redirected/cancelled ticket
+export const recallTicket = async (id: string, counterNumber: string): Promise<Ticket> => {
+  // First get the ticket details
+  const { data: ticketData, error: fetchError } = await supabase
+    .from('tickets')
+    .select('*')
+    .eq('id', id)
+    .single();
+  
+  if (fetchError) {
+    console.error('Error fetching ticket to recall:', fetchError);
+    throw fetchError;
+  }
+  
+  // Now update the ticket to 'serving' status
+  const { data, error } = await supabase
+    .from('tickets')
+    .update({
+      status: 'serving',
+      called_at: new Date().toISOString(),
+      counter_number: counterNumber,
+      completed_at: null // Clear the completed timestamp
+    })
+    .eq('id', id)
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Error recalling ticket:', error);
+    throw error;
+  }
+  
+  return mapDatabaseTicketToTicket(data);
 };
 
 // Función auxiliar para mapear campos de la base de datos a nuestros tipos locales

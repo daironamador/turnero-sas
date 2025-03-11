@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { toast } from 'sonner';
 import { useMutation } from "@tanstack/react-query";
@@ -6,7 +5,8 @@ import {
   callTicket, 
   completeTicket, 
   cancelTicket, 
-  redirectTicket
+  redirectTicket,
+  recallTicket
 } from '@/services/ticketService';
 import { Service, Ticket, Room, ServiceType } from '@/lib/types';
 import { useSpeechSynthesis } from './display/useSpeechSynthesis';
@@ -16,12 +16,14 @@ import CurrentTicket from './CurrentTicket';
 import NextTicket from './NextTicket';
 import TicketQueue from './TicketQueue';
 import RedirectDialog from './RedirectDialog';
+import TicketHistory from './TicketHistory';
 
 // Define types for mutation parameters
 type CallTicketParams = { ticketId: string; counterNumber: string };
 type CompleteTicketParams = { ticketId: string };
 type CancelTicketParams = { ticketId: string };
 type RedirectTicketParams = { ticketId: string; serviceType: ServiceType };
+type RecallTicketParams = { ticket: Ticket };
 
 interface TicketManagerProps {
   currentTicket?: Ticket;
@@ -95,6 +97,43 @@ const TicketManager: React.FC<TicketManagerProps> = ({
     },
   });
 
+  const recallTicketMutation = useMutation({
+    mutationFn: (params: RecallTicketParams) => 
+      recallTicket(params.ticket.id, counterNumber),
+    onSuccess: (_, variables) => {
+      toast.success(`Se ha vuelto a llamar al ticket ${variables.ticket.ticketNumber}`);
+      
+      // Find room name for this counter
+      let roomName = counterName || `sala ${counterNumber}`;
+      
+      // For redirected tickets, find the original room name if needed
+      let originalRoomName = undefined;
+      if (variables.ticket.redirectedFrom) {
+        const possibleRooms = rooms.filter(
+          r => r.service?.code === variables.ticket.redirectedFrom
+        );
+        if (possibleRooms.length > 0) {
+          originalRoomName = possibleRooms[0].name;
+        } else {
+          originalRoomName = `servicio ${variables.ticket.redirectedFrom}`;
+        }
+      }
+      
+      // Announce the recalled ticket
+      announceTicket(
+        variables.ticket.ticketNumber,
+        roomName,
+        variables.ticket.redirectedFrom,
+        originalRoomName
+      );
+      
+      onTicketChange();
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "No se pudo rellamar al ticket");
+    },
+  });
+
   const handleCallNext = async () => {
     if (!nextTicket) return;
     callTicketMutation.mutate({ 
@@ -126,7 +165,6 @@ const TicketManager: React.FC<TicketManagerProps> = ({
     setIsRedirectDialogOpen(false);
   };
 
-  // Handle "Call Again" functionality
   const handleCallAgain = () => {
     if (!currentTicket || !counterName) return;
     
@@ -152,6 +190,10 @@ const TicketManager: React.FC<TicketManagerProps> = ({
       originalRoomName
     );
     toast.success(`Volviendo a llamar al ticket ${currentTicket.ticketNumber}`);
+  };
+
+  const handleRecallFromHistory = (ticket: Ticket) => {
+    recallTicketMutation.mutate({ ticket });
   };
 
   return (
@@ -180,6 +222,14 @@ const TicketManager: React.FC<TicketManagerProps> = ({
         {/* Waiting Queue */}
         <TicketQueue waitingTickets={waitingTickets} />
       </div>
+
+      {/* Ticket History Section */}
+      <TicketHistory
+        counterNumber={counterNumber}
+        rooms={rooms}
+        services={services}
+        onRecallTicket={handleRecallFromHistory}
+      />
 
       {/* Redirect Dialog */}
       <RedirectDialog 
