@@ -1,3 +1,4 @@
+
 import { initSupabase } from './supabaseInit';
 import { User, AuthError } from '@supabase/supabase-js';
 
@@ -61,13 +62,13 @@ export const setupDefaultUser = async () => {
   try {
     const adminEmail = 'admin1@example.com';
     
-    // Verificar si el usuario ya existe intentando iniciar sesión
+    // Check if admin user exists by attempting to sign in
     const { data: userData, error: userError } = await supabase.auth.signInWithPassword({
       email: adminEmail,
       password: '123456'
     });
     
-    // Si hay un error de credenciales inválidas, intentamos crear el usuario
+    // If there's a credential error, try to create the user
     if (userError && userError.message.includes('Invalid login credentials')) {
       console.log('Creando usuario administrador predeterminado...');
       const { user, error } = await createUser(adminEmail, '123456', {
@@ -83,7 +84,7 @@ export const setupDefaultUser = async () => {
         console.log('Usuario administrador creado exitosamente');
       }
     } else if (!userError) {
-      // Si se pudo iniciar sesión, cerramos sesión para que el usuario inicie sesión manualmente
+      // If sign-in was successful, sign out
       await supabase.auth.signOut();
     }
   } catch (error) {
@@ -93,14 +94,13 @@ export const setupDefaultUser = async () => {
 
 // Setup realtime subscriptions for tickets
 export const setupRealtimeSubscriptions = () => {
-  // Suscripción a cambios en tickets
+  // Tickets subscription
   const ticketsSubscription = supabase
     .channel('tickets-changes')
     .on('postgres_changes', 
       { event: '*', schema: 'public', table: 'tickets' }, 
       (payload) => {
         console.log('Cambio en tickets recibido!', payload);
-        // Enviamos eventos que los componentes escucharán
         window.dispatchEvent(new CustomEvent('tickets-updated', { 
           detail: payload 
         }));
@@ -108,7 +108,7 @@ export const setupRealtimeSubscriptions = () => {
     )
     .subscribe();
     
-  // Suscripción a la tabla servicios
+  // Services subscription
   const servicesSubscription = supabase
     .channel('services-changes')
     .on('postgres_changes', 
@@ -120,7 +120,7 @@ export const setupRealtimeSubscriptions = () => {
     )
     .subscribe();
     
-  // Suscripción a la tabla salas
+  // Rooms subscription
   const roomsSubscription = supabase
     .channel('rooms-changes')
     .on('postgres_changes', 
@@ -132,7 +132,7 @@ export const setupRealtimeSubscriptions = () => {
     )
     .subscribe();
 
-  // Función de limpieza para eliminar las suscripciones
+  // Cleanup function
   return () => {
     supabase.removeChannel(ticketsSubscription);
     supabase.removeChannel(servicesSubscription);

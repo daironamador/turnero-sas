@@ -2,13 +2,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
-import { 
-  storeAuthTokens, 
-  getAuthTokens, 
-  clearAuthTokens, 
-  getPersistencePreference, 
-  setPersistencePreference as setStoredPersistencePreference 
-} from '@/lib/authUtils';
+import { setPersistencePreference as setStoredPersistencePreference, getPersistencePreference } from '@/lib/authUtils';
 import { toast } from 'sonner';
 
 type AuthContextType = {
@@ -35,53 +29,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log('Refreshing user session...');
       
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      const { data } = await supabase.auth.getSession();
       
-      if (currentSession) {
-        console.log('Session refreshed successfully:', currentSession.user.email);
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
-        
-        storeAuthTokens(currentSession.access_token, currentSession.refresh_token);
-        
-        if (currentSession?.user) {
-          setUserRole(currentSession.user.user_metadata?.role || 'viewer');
-        }
+      if (data.session) {
+        console.log('Session active:', data.session.user.email);
+        setSession(data.session);
+        setUser(data.session.user);
+        setUserRole(data.session.user.user_metadata?.role || 'viewer');
         return true;
-      } else {
-        const { accessToken, refreshToken } = getAuthTokens();
-        
-        if (accessToken && refreshToken) {
-          console.log('Attempting to restore session from localStorage tokens...');
-          
-          try {
-            const { data, error } = await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken,
-            });
-            
-            if (error) {
-              console.error('Error restoring session from tokens:', error);
-              clearAuthTokens();
-              return false;
-            }
-            
-            if (data && data.session) {
-              console.log('Session restored successfully from tokens:', data.session.user.email);
-              setSession(data.session);
-              setUser(data.session.user);
-              setUserRole(data.session.user.user_metadata?.role || 'viewer');
-              return true;
-            }
-          } catch (error) {
-            console.error('Error in session recovery process:', error);
-            clearAuthTokens();
-          }
-        }
-        
-        console.log('No session could be restored');
-        return false;
       }
+      
+      console.log('No session found during refresh');
+      return false;
     } catch (error) {
       console.error('Error refreshing user session:', error);
       return false;
@@ -91,14 +50,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const setPersistence = (isPersistent: boolean) => {
     setStoredPersistencePreference(isPersistent);
     setIsPersistent(isPersistent);
-    
-    if (session) {
-      if (isPersistent) {
-        storeAuthTokens(session.access_token, session.refresh_token);
-      } else {
-        clearAuthTokens();
-      }
-    }
   };
 
   useEffect(() => {
@@ -107,49 +58,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         console.log('Initializing auth session...');
         
-        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        const { data } = await supabase.auth.getSession();
         
-        if (currentSession) {
-          console.log('Active session found:', currentSession.user.email);
-          setSession(currentSession);
-          setUser(currentSession.user);
-          setUserRole(currentSession.user.user_metadata?.role || 'viewer');
-          
-          storeAuthTokens(currentSession.access_token, currentSession.refresh_token);
+        if (data.session) {
+          console.log('Active session found:', data.session.user.email);
+          setSession(data.session);
+          setUser(data.session.user);
+          setUserRole(data.session.user.user_metadata?.role || 'viewer');
         } else {
-          console.log('No active session found, checking localStorage...');
-          
-          const { accessToken, refreshToken } = getAuthTokens();
-          
-          if (accessToken && refreshToken) {
-            console.log('Found tokens in localStorage, attempting to restore session...');
-            try {
-              const { data, error } = await supabase.auth.setSession({
-                access_token: accessToken,
-                refresh_token: refreshToken,
-              });
-              
-              if (error) {
-                console.error('Error restoring session from localStorage:', error);
-                clearAuthTokens();
-              } else if (data && data.session) {
-                console.log('Session restored successfully from localStorage:', data.session.user.email);
-                setSession(data.session);
-                setUser(data.session.user);
-                setUserRole(data.session.user.user_metadata?.role || 'viewer');
-                
-                toast('Sesión restaurada automáticamente', {
-                  description: 'Has iniciado sesión con tu sesión guardada.',
-                  position: 'top-center',
-                });
-              }
-            } catch (parseError) {
-              console.error('Error restoring session from localStorage:', parseError);
-              clearAuthTokens();
-            }
-          } else {
-            console.log('No stored tokens found in localStorage');
-          }
+          console.log('No active session found');
         }
       } catch (error) {
         console.error('Error in session initialization:', error);
@@ -160,20 +77,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     getSession();
 
+    // Subscribe to auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
       console.log('Auth state changed:', event, newSession?.user?.email);
-      
-      if (newSession) {
-        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-          console.log('Storing session tokens in localStorage due to event:', event);
-          storeAuthTokens(newSession.access_token, newSession.refresh_token);
-        }
-      }
-      
-      if (event === 'SIGNED_OUT') {
-        console.log('Removing session tokens from localStorage');
-        clearAuthTokens();
-      }
       
       setSession(newSession);
       setUser(newSession?.user ?? null);
@@ -195,8 +101,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     try {
       await supabase.auth.signOut();
-      clearAuthTokens();
-      setIsPersistent(false);
       
       toast('Sesión cerrada', {
         description: 'Has cerrado sesión exitosamente.',

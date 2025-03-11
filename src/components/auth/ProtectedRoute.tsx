@@ -3,8 +3,6 @@ import React, { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { supabase } from '@/lib/supabase';
-import { getAuthTokens } from '@/lib/authUtils';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -19,30 +17,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   const location = useLocation();
   const [isCheckingSession, setIsCheckingSession] = useState(true);
 
-  // On component mount, try to refresh the user session
+  // On component mount, check authentication status
   useEffect(() => {
     const checkSession = async () => {
       try {
         console.log('ProtectedRoute: Checking session...');
-        // First check if there's a valid session with supabase
-        const { data } = await supabase.auth.getSession();
-        
-        if (data.session) {
-          console.log('ProtectedRoute: Valid session found');
-          setIsCheckingSession(false);
-          return;
-        }
-        
-        // If no active session, check localStorage and try to restore
-        const { accessToken, refreshToken } = getAuthTokens();
-        
-        if (accessToken && refreshToken) {
-          console.log('ProtectedRoute: No active session, but found stored tokens, attempting to refresh');
-          const refreshed = await refreshUser();
-          console.log('ProtectedRoute: Session refresh result:', refreshed);
-        } else {
-          console.log('ProtectedRoute: No stored tokens found');
-        }
+        await refreshUser();
       } catch (error) {
         console.error('ProtectedRoute: Error checking session:', error);
       } finally {

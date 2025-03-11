@@ -1,11 +1,11 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { getCompanySettings } from '@/services/settingsService';
 import { CompanySettings } from '@/lib/types';
 import { useAuth } from '@/contexts/AuthContext';
-import { getAuthTokens, storeAuthTokens } from '@/lib/authUtils';
 
 export const useLoginState = () => {
   const [loading, setLoading] = useState(false);
@@ -43,31 +43,13 @@ export const useLoginState = () => {
       setSessionLoading(true);
       
       try {
-        const { data: sessionData } = await supabase.auth.getSession();
+        const { data } = await supabase.auth.getSession();
         
-        if (sessionData.session) {
+        if (data.session) {
           console.log('Login: Active session found, redirecting to:', from);
           navigate(from, { replace: true });
-          return;
-        }
-        
-        console.log('Login: No active session, checking localStorage...');
-        // Check localStorage for tokens
-        const { accessToken, refreshToken } = getAuthTokens();
-        
-        if (accessToken && refreshToken) {
-          console.log('Login: Found stored tokens, attempting to restore');
-          const success = await refreshUser();
-          
-          if (success) {
-            console.log('Login: Session restored successfully, redirecting to:', from);
-            navigate(from, { replace: true });
-            return;
-          } else {
-            console.log('Login: Failed to restore session, showing login form');
-          }
         } else {
-          console.log('Login: No stored tokens found, showing login form');
+          console.log('Login: No active session, showing login form');
         }
       } catch (error) {
         console.error('Login: Error checking session:', error);
@@ -77,7 +59,7 @@ export const useLoginState = () => {
     };
     
     checkSession();
-  }, [navigate, from, refreshUser]);
+  }, [navigate, from]);
 
   // Handle login form submission
   const handleLogin = async (e: React.FormEvent) => {
@@ -93,7 +75,6 @@ export const useLoginState = () => {
       setLoading(true);
       console.log(`Intentando iniciar sesión con: ${email}`);
       
-      // Using cookies for auth (defined in supabaseInit)
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
@@ -142,7 +123,7 @@ export const useLoginState = () => {
             throw signUpError;
           }
           
-          const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({
+          const { error: retryError } = await supabase.auth.signInWithPassword({
             email,
             password
           });
@@ -158,14 +139,6 @@ export const useLoginState = () => {
             description: "Bienvenido al sistema",
           });
           
-          // Store tokens after successful login
-          if (retryData && retryData.session) {
-            storeAuthTokens(
-              retryData.session.access_token, 
-              retryData.session.refresh_token
-            );
-          }
-          
           navigate(from, { replace: true });
           return;
         }
@@ -174,14 +147,6 @@ export const useLoginState = () => {
       }
       
       setPersistence(rememberMe);
-      
-      // Store tokens explicitly in localStorage
-      if (data && data.session) {
-        storeAuthTokens(
-          data.session.access_token,
-          data.session.refresh_token
-        );
-      }
       
       toast({
         title: "Inicio de sesión exitoso",
