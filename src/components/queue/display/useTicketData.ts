@@ -39,16 +39,16 @@ export function useTicketData(refreshInterval: number = 5000) {
     refetchInterval: refreshInterval,
   });
   
-  // Fetch last completed/redirected tickets
-  const lastCalledTicketsQuery = useQuery({
-    queryKey: ['lastCalledTickets'],
+  // Fetch waiting tickets (previously last called tickets)
+  const waitingTicketsQuery = useQuery({
+    queryKey: ['waitingTickets'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('tickets')
         .select('*')
-        .in('status', ['completed', 'redirected'])
-        .order('completed_at', { ascending: false })
-        .limit(5);
+        .eq('status', 'waiting')
+        .order('created_at', { ascending: true })
+        .limit(10);
       
       if (error) throw error;
       
@@ -87,7 +87,7 @@ export function useTicketData(refreshInterval: number = 5000) {
 
   return {
     servingTicketsQuery,
-    lastCalledTicketsQuery,
+    waitingTicketsQuery, // Changed from lastCalledTicketsQuery
     roomsQuery,
     newlyCalledTicket,
     setNewlyCalledTicket,

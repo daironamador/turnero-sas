@@ -1,100 +1,105 @@
 
 import { useEffect } from 'react';
-import { Ticket } from '@/lib/types';
+import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabase';
 import { useSpeechSynthesis } from './useSpeechSynthesis';
+import { Ticket } from '@/lib/types';
 
 interface UseTicketUpdatesProps {
   roomsQuery: any;
   servingTicketsQuery: any;
-  lastCalledTicketsQuery: any;
+  waitingTicketsQuery: any; // Changed from lastCalledTicketsQuery
   newlyCalledTicket: Ticket | null;
   setNewlyCalledTicket: (ticket: Ticket | null) => void;
   lastAnnounced: string | null;
-  setLastAnnounced: (ticketKey: string | null) => void;
+  setLastAnnounced: (id: string | null) => void;
 }
 
 export function useTicketUpdates({
   roomsQuery,
   servingTicketsQuery,
-  lastCalledTicketsQuery,
+  waitingTicketsQuery, // Changed from lastCalledTicketsQuery
   newlyCalledTicket,
   setNewlyCalledTicket,
   lastAnnounced,
   setLastAnnounced
 }: UseTicketUpdatesProps) {
+  const queryClient = useQueryClient();
   const { announceTicket } = useSpeechSynthesis();
-
-  // Listen for real-time updates on tickets table
+  
+  // Set up real-time listener for ticket changes
   useEffect(() => {
-    const handleTicketsUpdated = (event: CustomEvent) => {
-      try {
-        const payload = event.detail;
-        
-        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-          // If a ticket was just set to 'serving', announce it
-          if (payload.new.status === 'serving' && 
-              payload.new.called_at && 
-              (!payload.old || payload.old.status !== 'serving')) {
+    const channel = supabase.channel('schema-db-changes')
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'tickets'
+        }, 
+        (payload) => {
+          console.info('Cambio en tickets recibido!', payload);
+          
+          // Refresh the queries to get updated data
+          queryClient.invalidateQueries({ queryKey: ['servingTickets'] });
+          queryClient.invalidateQueries({ queryKey: ['waitingTickets'] }); // Changed from 'lastCalledTickets'
+          
+          // Handle newly called tickets
+          if (payload.eventType === 'UPDATE' && payload.new.status === 'serving') {
+            const calledTicket = {
+              id: payload.new.id,
+              ticketNumber: payload.new.ticket_number,
+              serviceType: payload.new.service_type,
+              status: payload.new.status,
+              isVip: payload.new.is_vip,
+              createdAt: new Date(payload.new.created_at),
+              calledAt: payload.new.called_at ? new Date(payload.new.called_at) : undefined,
+              counterNumber: payload.new.counter_number,
+            } as Ticket;
             
-            const ticketNumber = payload.new.ticket_number;
-            const counterNumber = payload.new.counter_number;
+            setNewlyCalledTicket(calledTicket);
             
-            if (!ticketNumber) {
-              console.error("Missing ticket number", payload);
-              return;
-            }
-            
-            // Prevent duplicate announcements for the same ticket
-            const ticketKey = `${ticketNumber}-${counterNumber}`;
-            if (lastAnnounced !== ticketKey) {
-              // Get room name if possible
-              let roomName = counterNumber ? `sala ${counterNumber}` : 'recepción';
-              if (roomsQuery.data && counterNumber) {
-                const room = roomsQuery.data.find((r: any) => r.id === counterNumber);
+            // Only announce if this is a new call (not already announced)
+            if (lastAnnounced !== calledTicket.id) {
+              // Find room name
+              let roomName = `sala ${calledTicket.counterNumber}`;
+              if (roomsQuery.data && calledTicket.counterNumber) {
+                const room = roomsQuery.data.find((r: any) => r.id === calledTicket.counterNumber);
                 if (room) {
                   roomName = room.name;
                 }
               }
               
-              // Create ticket object for display
-              const newTicket: Ticket = {
-                id: payload.new.id,
-                ticketNumber: ticketNumber,
-                serviceType: payload.new.service_type,
-                status: payload.new.status,
-                isVip: payload.new.is_vip || false,
-                createdAt: new Date(payload.new.created_at),
-                calledAt: payload.new.called_at ? new Date(payload.new.called_at) : undefined,
-                counterNumber: counterNumber,
-                patientName: payload.new.patient_name,
-              };
-              
-              setNewlyCalledTicket(newTicket);
-              setLastAnnounced(ticketKey);
-              
-              // Announce the ticket with voice
-              announceTicket(ticketNumber, roomName);
-              
-              // Remove the notification after a few seconds
-              setTimeout(() => {
-                setNewlyCalledTicket(null);
-              }, 8000);
+              // Announce the called ticket
+              announceTicket(calledTicket.ticketNumber, roomName);
+              setLastAnnounced(calledTicket.id);
             }
           }
-        }
-        
-        // Refresh queries when changes happen
-        servingTicketsQuery.refetch();
-        lastCalledTicketsQuery.refetch();
-      } catch (error) {
-        console.error("Error handling ticket update:", error);
-      }
-    };
+        });
     
-    window.addEventListener('tickets-updated', handleTicketsUpdated as EventListener);
+    channel.subscribe();
     
     return () => {
-      window.removeEventListener('tickets-updated', handleTicketsUpdated as EventListener);
+      supabase.removeChannel(channel);
     };
-  }, [lastAnnounced, roomsQuery.data, servingTicketsQuery, lastCalledTicketsQuery, setNewlyCalledTicket, setLastAnnounced, announceTicket]);
+  }, [
+    queryClient, 
+    roomsQuery.data, 
+    announceTicket, 
+    setNewlyCalledTicket, 
+    lastAnnounced, 
+    setLastAnnounced
+  ]);
+  
+  // Clear notification after 10 seconds
+  useEffect(() => {
+    if (newlyCalledTicket) {
+      const timer = setTimeout(() => {
+        setNewlyCalledTicket(null);
+      }, 10000);
+      
+      return () => {
+        clearTimeout(timer);
+      };
+    }
+  }, [newlyCalledTicket, setNewlyCalledTicket]);
 }

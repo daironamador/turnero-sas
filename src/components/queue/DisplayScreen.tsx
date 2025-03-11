@@ -16,7 +16,7 @@ interface DisplayScreenProps {
 const DisplayScreen: React.FC<DisplayScreenProps> = ({ refreshInterval = 5000 }) => {
   const {
     servingTicketsQuery,
-    lastCalledTicketsQuery,
+    waitingTicketsQuery,
     roomsQuery,
     newlyCalledTicket,
     setNewlyCalledTicket,
@@ -28,7 +28,7 @@ const DisplayScreen: React.FC<DisplayScreenProps> = ({ refreshInterval = 5000 })
   useTicketUpdates({
     roomsQuery,
     servingTicketsQuery,
-    lastCalledTicketsQuery,
+    waitingTicketsQuery,
     newlyCalledTicket,
     setNewlyCalledTicket,
     lastAnnounced,
@@ -55,11 +55,11 @@ const DisplayScreen: React.FC<DisplayScreenProps> = ({ refreshInterval = 5000 })
           isLoading={servingTicketsQuery.isLoading} 
         />
         
-        {/* Last called tickets */}
+        {/* Waiting tickets (previously Last called tickets) */}
         <LastCalledSection 
-          tickets={lastCalledTicketsQuery.data} 
+          tickets={waitingTicketsQuery.data} 
           rooms={roomsQuery.data}
-          isLoading={lastCalledTicketsQuery.isLoading} 
+          isLoading={waitingTicketsQuery.isLoading} 
         />
       </div>
       
