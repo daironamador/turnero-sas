@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Home, Ticket, PhoneCall, LayoutTemplate, BarChart3, Settings } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import ProfileButton from '@/components/auth/ProfileButton';
@@ -10,6 +10,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
+import { getCompanySettings } from '@/services/settingsService';
+import { CompanySettings } from '@/lib/types';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -17,12 +19,28 @@ interface MainLayoutProps {
 
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const location = useLocation();
+  const [settings, setSettings] = useState<CompanySettings | null>(null);
+  
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const data = await getCompanySettings();
+        setSettings(data);
+      } catch (error) {
+        console.error('Error al cargar la configuración:', error);
+      }
+    };
+    
+    loadSettings();
+  }, []);
   
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6">
         <div className="flex-1">
-          <h1 className="font-semibold text-lg md:text-xl">Sistema de Gestión de Turnos</h1>
+          <h1 className="font-semibold text-lg md:text-xl">
+            {settings?.name || 'Sistema de Gestión de Turnos'}
+          </h1>
         </div>
         <div className="flex items-center gap-4">
           <nav className="hidden md:flex items-center gap-4">
