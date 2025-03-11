@@ -8,7 +8,7 @@ import { Ticket } from '@/lib/types';
 interface UseTicketUpdatesProps {
   roomsQuery: any;
   servingTicketsQuery: any;
-  waitingTicketsQuery: any; // Changed from lastCalledTicketsQuery
+  waitingTicketsQuery: any;
   newlyCalledTicket: Ticket | null;
   setNewlyCalledTicket: (ticket: Ticket | null) => void;
   lastAnnounced: string | null;
@@ -18,7 +18,7 @@ interface UseTicketUpdatesProps {
 export function useTicketUpdates({
   roomsQuery,
   servingTicketsQuery,
-  waitingTicketsQuery, // Changed from lastCalledTicketsQuery
+  waitingTicketsQuery,
   newlyCalledTicket,
   setNewlyCalledTicket,
   lastAnnounced,
@@ -41,7 +41,7 @@ export function useTicketUpdates({
           
           // Refresh the queries to get updated data
           queryClient.invalidateQueries({ queryKey: ['servingTickets'] });
-          queryClient.invalidateQueries({ queryKey: ['waitingTickets'] }); // Changed from 'lastCalledTickets'
+          queryClient.invalidateQueries({ queryKey: ['waitingTickets'] });
           
           // Handle newly called tickets
           if (payload.eventType === 'UPDATE' && payload.new.status === 'serving') {
@@ -54,13 +54,15 @@ export function useTicketUpdates({
               createdAt: new Date(payload.new.created_at),
               calledAt: payload.new.called_at ? new Date(payload.new.called_at) : undefined,
               counterNumber: payload.new.counter_number,
+              redirectedFrom: payload.new.redirected_from,
+              previousTicketNumber: payload.new.previous_ticket_number
             } as Ticket;
             
             setNewlyCalledTicket(calledTicket);
             
             // Only announce if this is a new call (not already announced)
             if (lastAnnounced !== calledTicket.id) {
-              // Find room name
+              // Find room name for current counter
               let roomName = `sala ${calledTicket.counterNumber}`;
               if (roomsQuery.data && calledTicket.counterNumber) {
                 const room = roomsQuery.data.find((r: any) => r.id === calledTicket.counterNumber);
@@ -69,8 +71,27 @@ export function useTicketUpdates({
                 }
               }
               
-              // Announce the called ticket
-              announceTicket(calledTicket.ticketNumber, roomName);
+              // For redirected tickets, find the original room name
+              let originalRoomName = undefined;
+              if (calledTicket.redirectedFrom && roomsQuery.data) {
+                // We look for rooms with the matching service type (where the ticket came from)
+                const possibleRooms = roomsQuery.data.filter(
+                  (r: any) => r.service?.code === calledTicket.redirectedFrom
+                );
+                if (possibleRooms.length > 0) {
+                  originalRoomName = possibleRooms[0].name;
+                } else {
+                  originalRoomName = `servicio ${calledTicket.redirectedFrom}`;
+                }
+              }
+              
+              // Announce the called ticket with redirection info if applicable
+              announceTicket(
+                calledTicket.ticketNumber, 
+                roomName, 
+                calledTicket.redirectedFrom, 
+                originalRoomName
+              );
               setLastAnnounced(calledTicket.id);
             }
           }

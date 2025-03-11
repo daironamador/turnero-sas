@@ -35,13 +35,28 @@ export function useSpeechSynthesis() {
   };
 
   // Function to announce ticket via speech synthesis
-  const announceTicket = (ticketNumber: string, counterName: string) => {
+  const announceTicket = (
+    ticketNumber: string, 
+    counterName: string, 
+    redirectedFrom?: string, 
+    originalRoomName?: string
+  ) => {
     if (!window.speechSynthesis) return;
     
     const formattedNumber = formatTicketNumber(ticketNumber);
     
+    // Construct the announcement text
+    let announcementText = '';
+    if (redirectedFrom && originalRoomName) {
+      // For redirected tickets
+      announcementText = `Turno ${formattedNumber}, referido de ${originalRoomName}, pasar a ${counterName}`;
+    } else {
+      // For regular tickets
+      announcementText = `Turno ${formattedNumber}, pasar a ${counterName}`;
+    }
+    
     const speech = new SpeechSynthesisUtterance();
-    speech.text = `Turno ${formattedNumber}, pasar a ${counterName}`;
+    speech.text = announcementText;
     speech.volume = 1;
     speech.rate = 0.9;
     speech.pitch = 1;

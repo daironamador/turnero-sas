@@ -21,6 +21,20 @@ const TicketNotification: React.FC<TicketNotificationProps> = ({ ticket, rooms }
     }
   }
 
+  // Find original room name for redirected tickets
+  let originalRoomName = '';
+  if (ticket.redirectedFrom && rooms) {
+    // For redirected tickets, we need to find the original room
+    // We'll use the service type to identify which rooms could have been the source
+    const possibleRooms = rooms.filter(r => r.service?.code === ticket.redirectedFrom);
+    if (possibleRooms.length > 0) {
+      // We'll just use the first room with matching service as an approximation
+      originalRoomName = possibleRooms[0].name;
+    } else {
+      originalRoomName = `servicio ${ticket.redirectedFrom}`;
+    }
+  }
+
   // Format ticket number to remove leading zeros
   const formattedNumber = ticket.ticketNumber ? parseInt(ticket.ticketNumber.replace(/\D/g, ''), 10).toString() : '';
 
@@ -33,9 +47,11 @@ const TicketNotification: React.FC<TicketNotificationProps> = ({ ticket, rooms }
           {ticket.isVip && <Star className="ml-2 h-5 w-5" />}
         </span>
         <span className="text-xl">
-          {ticket.counterNumber ? 
-            `por favor dirigirse a ${roomName}` : 
-            "por favor dirigirse a recepción"}
+          {ticket.redirectedFrom ? 
+            `referido de ${originalRoomName}, por favor dirigirse a ${roomName}` : 
+            ticket.counterNumber ? 
+              `por favor dirigirse a ${roomName}` : 
+              "por favor dirigirse a recepción"}
         </span>
         <Volume2 className="w-6 h-6 ml-auto" />
       </div>
