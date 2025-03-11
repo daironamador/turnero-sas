@@ -7,20 +7,24 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { getCompanySettings } from '@/services/settingsService';
 import { CompanySettings } from '@/lib/types';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Login = () => {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [stayLoggedIn, setStayLoggedIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<CompanySettings | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { toast: uiToast } = useToast();
+  const { setSession } = useAuth();
   
   // Get the return URL from location state (if available)
   const from = location.state?.from || '/';
@@ -75,7 +79,7 @@ const Login = () => {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [navigate, from]);
+  }, [navigate, from, setSession]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,12 +92,15 @@ const Login = () => {
     
     try {
       setLoading(true);
-      console.log(`Intentando iniciar sesión con: ${email}`);
+      console.log(`Intentando iniciar sesión con: ${email}, mantener sesión: ${stayLoggedIn}`);
       
-      // Sign in with Supabase Auth (prioritize Auth)
+      // Sign in with Supabase Auth with persistence option
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
-        password
+        password,
+        options: {
+          persistSession: stayLoggedIn // This controls whether the session is persisted across browser sessions
+        }
       });
       
       // If there's an auth error
@@ -120,7 +127,8 @@ const Login = () => {
                 username: userData.username,
                 role: userData.role,
                 service_ids: userData.service_ids || []
-              }
+              },
+              persistSession: stayLoggedIn
             }
           });
           
@@ -135,7 +143,8 @@ const Login = () => {
               // Try to sign in again
               const { error: retryError } = await supabase.auth.signInWithPassword({
                 email,
-                password
+                password,
+                options: { persistSession: stayLoggedIn }
               });
               
               if (!retryError) {
@@ -149,7 +158,8 @@ const Login = () => {
           // Try to sign in again
           const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({
             email,
-            password
+            password,
+            options: { persistSession: stayLoggedIn }
           });
           
           if (retryError) {
@@ -168,7 +178,9 @@ const Login = () => {
       toast("Inicio de sesión exitoso. Bienvenido al sistema");
       
       // Ensure session is properly set before navigating
-      await supabase.auth.getSession();
+      if (data.session) {
+        setSession(data.session);
+      }
       
       navigate(from);
     } catch (error: any) {
@@ -230,6 +242,16 @@ const Login = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loading}
               />
+            </div>
+            <div className="flex items-center space-x-2 pt-2">
+              <Checkbox 
+                id="stayLoggedIn" 
+                checked={stayLoggedIn} 
+                onCheckedChange={(checked) => setStayLoggedIn(checked === true)}
+              />
+              <Label htmlFor="stayLoggedIn" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                Permanecer logueado
+              </Label>
             </div>
           </CardContent>
           <CardFooter>

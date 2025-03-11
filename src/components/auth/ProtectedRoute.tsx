@@ -13,20 +13,24 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
   allowedRoles = []
 }) => {
-  const { user, loading, refreshUser } = useAuth();
+  const { user, loading, refreshUser, userRole } = useAuth();
   const location = useLocation();
 
   // Attempt to refresh the user session when the component mounts
   useEffect(() => {
     const checkAndRefreshSession = async () => {
-      if (!user && !loading) {
+      if (!user) {
         console.log('No user found, attempting to refresh session');
-        await refreshUser();
+        try {
+          await refreshUser();
+        } catch (error) {
+          console.error('Error refreshing user session:', error);
+        }
       }
     };
     
     checkAndRefreshSession();
-  }, [user, loading, refreshUser]);
+  }, [user, refreshUser]);
 
   // Allow access to /display without authentication
   if (location.pathname === '/display') {
@@ -50,13 +54,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   // Check if role-based access control is needed
   if (allowedRoles.length > 0) {
-    // Get user role from auth metadata
-    const userRole = user.user_metadata?.role || 'viewer';
     console.log('Checking user role:', userRole, 'against allowed roles:', allowedRoles);
 
     // Check if user has the required role
     if (!allowedRoles.includes(userRole)) {
       toast.error("No tienes permisos para acceder a esta sección");
+      console.log(`Access denied: User role "${userRole}" not in allowed roles:`, allowedRoles);
       return <Navigate to="/" replace />;
     }
   }
