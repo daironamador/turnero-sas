@@ -48,10 +48,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsPersistent(isPersistent);
     
     // Update session persistence setting in Supabase
-    // Using the correct method for this version of Supabase client
     if (session) {
-      // Instead of using updateSession, we'll set the session with the same token
-      // This effectively refreshes the session with current settings
+      // Use setSession instead of updateSession (which doesn't exist in this version)
       supabase.auth.setSession({
         access_token: session.access_token,
         refresh_token: session.refresh_token,
@@ -63,8 +61,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const getSession = async () => {
       setLoading(true);
       try {
-        // Get existing session first
-        await refreshUser();
+        // Try to restore session from localStorage first if available
+        const storedSession = localStorage.getItem('supabase-auth-session');
+        if (storedSession) {
+          const parsedSession = JSON.parse(storedSession);
+          const { data, error } = await supabase.auth.setSession({
+            access_token: parsedSession.access_token,
+            refresh_token: parsedSession.refresh_token,
+          });
+          
+          if (error) {
+            console.error('Error restoring session:', error);
+            localStorage.removeItem('supabase-auth-session');
+          } else if (data && data.session) {
+            setSession(data.session);
+            setUser(data.session.user);
+            setUserRole(data.session.user.user_metadata?.role || 'viewer');
+          }
+        } else {
+          // If no stored session, get the current session
+          await refreshUser();
+        }
       } catch (error) {
         console.error('Error getting session:', error);
       } finally {
@@ -74,13 +91,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     getSession();
 
-    // Configure Supabase auth to use persisted auth storage
-    supabase.auth.onAuthStateChange((event, session) => {
+    // Set up auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('Auth state changed:', event);
       
-      // Store auth session in localStorage for persistence
-      if (session) {
+      // Store session in localStorage when user logs in
+      if (session && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
         localStorage.setItem('supabase-auth-session', JSON.stringify(session));
+      }
+      
+      // Remove session from localStorage when user logs out
+      if (event === 'SIGNED_OUT') {
+        localStorage.removeItem('supabase-auth-session');
       }
       
       setSession(session);
@@ -96,34 +118,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     });
 
-    // Check for stored session on component mount
-    const storedSession = localStorage.getItem('supabase-auth-session');
-    if (storedSession && !session) {
-      const parsedSession = JSON.parse(storedSession);
-      supabase.auth.setSession({
-        access_token: parsedSession.access_token,
-        refresh_token: parsedSession.refresh_token,
-      }).then(({ data }) => {
-        if (data.session) {
-          setSession(data.session);
-          setUser(data.session.user);
-          setUserRole(data.session.user.user_metadata?.role || 'viewer');
-        }
-      }).catch((error) => {
-        console.error('Error restoring session:', error);
-        localStorage.removeItem('supabase-auth-session');
-      });
-    }
-
     return () => {
       // Cleanup auth subscription when component unmounts
-      supabase.auth.onAuthStateChange(() => {});
+      subscription.unsubscribe();
     };
   }, []);
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    // Clear persistence setting from localStorage when signing out
+    // Clear stored data from localStorage when signing out
     localStorage.removeItem('auth-persistence');
     localStorage.removeItem('supabase-auth-session');
     setIsPersistent(false);
