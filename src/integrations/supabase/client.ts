@@ -14,6 +14,22 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
 // Función para crear un nuevo usuario
 export const createUser = async (email: string, password: string, userData: any) => {
   try {
+    // First, check if user already exists in the users table
+    const { data: existingUser, error: checkError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .single();
+      
+    if (existingUser) {
+      console.log('Usuario ya existe en la tabla users:', existingUser);
+      return { 
+        user: existingUser, 
+        error: null, 
+        message: 'El usuario ya existe en el sistema.'
+      };
+    }
+    
     // First, try to create the auth user directly via signup
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email,
@@ -68,6 +84,22 @@ export const createUser = async (email: string, password: string, userData: any)
     
     // If signup successful, also create record in users table to ensure it exists
     if (signUpData.user) {
+      // Check if user already exists in the users table
+      const { data: existingUserData, error: existingUserError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', signUpData.user.id)
+        .single();
+        
+      if (!existingUserError && existingUserData) {
+        // User already exists in the users table, no need to create
+        return { 
+          user: signUpData.user, 
+          error: null,
+          message: 'Usuario creado correctamente. Se ha enviado un correo de verificación.'
+        };
+      }
+      
       const { error: userError } = await supabase
         .from('users')
         .insert([
