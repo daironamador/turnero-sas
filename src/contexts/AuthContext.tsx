@@ -2,7 +2,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
-import { toast } from 'sonner';
 
 type AuthContextType = {
   session: Session | null;
@@ -11,7 +10,6 @@ type AuthContextType = {
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
   userRole: string;
-  setSession: React.Dispatch<React.SetStateAction<Session | null>>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -21,61 +19,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string>('viewer');
-  const [refreshCount, setRefreshCount] = useState(0);
-  const [lastRefreshTime, setLastRefreshTime] = useState(0);
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const refreshUser = async () => {
-    // Reduce refresh frequency by increasing minimum time between refreshes to 10 seconds
-    const now = Date.now();
-    if (now - lastRefreshTime < 10000) {
-      return;
-    }
-    
-    // Prevent concurrent refreshes
-    if (isRefreshing) {
-      return;
-    }
-    
-    setIsRefreshing(true);
-    setLastRefreshTime(now);
-    
     try {
-      console.log('Refreshing user session...');
-      const { data: { session: newSession }, error } = await supabase.auth.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
+      setSession(session);
+      setUser(session?.user ?? null);
       
-      if (error) {
-        console.error('Error refreshing session:', error);
-        return;
+      // Set user role from metadata
+      if (session?.user) {
+        setUserRole(session.user.user_metadata?.role || 'viewer');
       }
-      
-      if (newSession) {
-        setSession(newSession);
-        setUser(newSession.user ?? null);
-        
-        // Set user role from metadata
-        if (newSession.user) {
-          setUserRole(newSession.user.user_metadata?.role || 'viewer');
-          console.log('Session refreshed successfully:', newSession.user.email, 'with role:', newSession.user.user_metadata?.role || 'viewer');
-        } 
-      } else {
-        console.log('No session found during refresh');
-      }
-      
     } catch (error) {
       console.error('Error getting session:', error);
-    } finally {
-      setIsRefreshing(false);
-      setLoading(false);
     }
   };
 
   useEffect(() => {
-    let isInitialLoad = true;
-    
     const getSession = async () => {
-      if (!isInitialLoad) return; // Only run during initial load
-      
       setLoading(true);
       try {
         await refreshUser();
@@ -83,92 +44,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.error('Error getting session:', error);
       } finally {
         setLoading(false);
-        isInitialLoad = false;
       }
     };
 
     getSession();
 
-    // Setup subscription to auth changes with persistent session handling
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, newSession) => {
-        console.log('Auth state changed:', event, newSession?.user?.email);
+      (_event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
         
-        if (event === 'SIGNED_OUT') {
-          console.log('User signed out, clearing session state');
-          setSession(null);
-          setUser(null);
+        // Update user role when auth state changes
+        if (session?.user) {
+          setUserRole(session.user.user_metadata?.role || 'viewer');
+        } else {
           setUserRole('viewer');
-        } else if (newSession) {
-          console.log('New session detected, updating state');
-          setSession(newSession);
-          setUser(newSession.user);
-          
-          // Update user role when auth state changes
-          if (newSession.user) {
-            const role = newSession.user.user_metadata?.role || 'viewer';
-            console.log('Setting user role:', role);
-            setUserRole(role);
-          }
-        }
-        
-        // Handle token refresh events
-        if (event === 'TOKEN_REFRESHED') {
-          console.log('Token refreshed successfully');
         }
         
         setLoading(false);
       }
     );
 
-    // Setup a periodic session check but only if we have a session
-    const sessionCheckInterval = setInterval(async () => {
-      // Only check if we believe we have a session and are not already loading or refreshing
-      if (session && !loading && !isRefreshing) {
-        console.log('Performing periodic session check...');
-        try {
-          const { data, error } = await supabase.auth.getSession();
-          
-          if (error) {
-            console.error('Session check error:', error);
-          } else if (data.session === null && session !== null) {
-            // Session was lost unexpectedly
-            console.warn('Session lost unexpectedly, attempting to recover');
-            setRefreshCount(prev => prev + 1);
-            if (refreshCount < 3) { // Limit refresh attempts to prevent infinite loops
-              await refreshUser();
-            } else {
-              console.error('Maximum refresh attempts reached, clearing session');
-              setSession(null);
-              setUser(null);
-            }
-          } else {
-            console.log('Session check completed, session is valid');
-          }
-        } catch (error) {
-          console.error('Error during session check:', error);
-        }
-      }
-    }, 30 * 60 * 1000); // Check every 30 minutes 
-
     return () => {
       subscription.unsubscribe();
-      clearInterval(sessionCheckInterval);
     };
-  }, [session, loading, refreshCount, isRefreshing]);
+  }, []);
 
   const signOut = async () => {
-    try {
-      console.log('Signing out user...');
-      setLoading(true);
-      await supabase.auth.signOut();
-      setLoading(false);
-      toast('Sesión cerrada correctamente');
-    } catch (error) {
-      console.error('Error signing out:', error);
-      setLoading(false);
-      toast('Error al cerrar sesión');
-    }
+    await supabase.auth.signOut();
   };
 
   const value = {
@@ -177,8 +80,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loading,
     signOut,
     refreshUser,
-    userRole,
-    setSession
+    userRole
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

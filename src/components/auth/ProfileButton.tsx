@@ -12,11 +12,12 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { toast } from 'sonner';
+import { useToast } from '@/hooks/use-toast';
 
 const ProfileButton = () => {
-  const { user, signOut, userRole } = useAuth();
+  const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [userInitial, setUserInitial] = useState('U');
 
   useEffect(() => {
@@ -27,13 +28,19 @@ const ProfileButton = () => {
 
   const handleSignOut = async () => {
     try {
-      console.log('Signing out user');
       await signOut();
-      toast("Ha cerrado sesión correctamente");
+      toast({
+        title: "Sesión cerrada",
+        description: "Ha cerrado sesión correctamente",
+      });
       navigate('/login');
     } catch (error) {
       console.error('Error signing out:', error);
-      toast("No se pudo cerrar la sesión");
+      toast({
+        title: "Error",
+        description: "No se pudo cerrar la sesión",
+        variant: "destructive",
+      });
     }
   };
 
@@ -50,10 +57,6 @@ const ProfileButton = () => {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel>Mi cuenta</DropdownMenuLabel>
-        <DropdownMenuLabel className="text-xs text-muted-foreground">
-          Rol: {userRole === 'admin' ? 'Administrador' : 
-               userRole === 'operator' ? 'Operador' : 'Visualizador'}
-        </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem className="cursor-pointer" onClick={() => navigate('/perfil')}>
           <UserIcon className="mr-2 h-4 w-4" />

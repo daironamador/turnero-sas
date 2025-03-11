@@ -7,34 +7,22 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { getCompanySettings } from '@/services/settingsService';
 import { CompanySettings } from '@/lib/types';
-import { toast } from 'sonner';
-import { useAuth } from '@/contexts/AuthContext';
 
 const Login = () => {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [stayLoggedIn, setStayLoggedIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<CompanySettings | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const { toast: uiToast } = useToast();
-  const { setSession, user } = useAuth();
+  const { toast } = useToast();
   
   // Get the return URL from location state (if available)
   const from = location.state?.from || '/';
-
-  // Redirect if user is already logged in
-  useEffect(() => {
-    if (user) {
-      navigate(from, { replace: true });
-    }
-  }, [user, navigate, from]);
 
   // Cargar configuración de la empresa para mostrar el logo
   useEffect(() => {
@@ -50,6 +38,29 @@ const Login = () => {
     loadSettings();
   }, []);
 
+  // Check if user is already logged in
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        navigate(from);
+      }
+    };
+    
+    checkSession();
+
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session) {
+        navigate(from);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [navigate, from]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -61,9 +72,9 @@ const Login = () => {
     
     try {
       setLoading(true);
-      console.log(`Intentando iniciar sesión con: ${email}, mantener sesión: ${stayLoggedIn}`);
+      console.log(`Intentando iniciar sesión con: ${email}`);
       
-      // Sign in with Supabase Auth
+      // Sign in with Supabase Auth (prioritize Auth)
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
@@ -72,18 +83,73 @@ const Login = () => {
       // If there's an auth error
       if (error) {
         console.log('Error de autenticación:', error.message);
+        
+        // Check if user exists in the users table but not in auth
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', email)
+          .single();
+        
+        if (!userError && userData && userData.is_active) {
+          console.log('El usuario existe en la tabla pero no en auth, intentando registrarlo');
+          
+          // Try to create user in auth
+          const { error: signUpError } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              data: {
+                name: userData.name,
+                username: userData.username,
+                role: userData.role,
+                service_ids: userData.service_ids || []
+              }
+            }
+          });
+          
+          if (signUpError) {
+            if (signUpError.message.includes('email rate limit')) {
+              // Inform user about the situation and allow them to continue
+              toast({
+                title: "Advertencia de autenticación",
+                description: "Hay un problema temporal con la verificación, pero puede continuar usando el sistema.",
+                variant: "default"
+              });
+              navigate(from);
+              return;
+            }
+            throw signUpError;
+          }
+          
+          // Try to sign in again
+          const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({
+            email,
+            password
+          });
+          
+          if (retryError) {
+            throw retryError;
+          }
+          
+          toast({
+            title: "Inicio de sesión exitoso",
+            description: "Bienvenido al sistema",
+          });
+          
+          navigate(from);
+          return;
+        }
+        
         throw error;
       }
       
-      toast("Inicio de sesión exitoso. Bienvenido al sistema");
+      toast({
+        title: "Inicio de sesión exitoso",
+        description: "Bienvenido al sistema",
+      });
       
-      // Ensure session is properly set before navigating
-      if (data.session) {
-        setSession(data.session);
-        // Use replace: true to prevent back button from returning to login page
-        navigate(from, { replace: true });
-      }
-      
+      navigate(from);
     } catch (error: any) {
       console.error('Login error:', error);
       setError(error.message || 'Error al iniciar sesión');
@@ -143,16 +209,6 @@ const Login = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loading}
               />
-            </div>
-            <div className="flex items-center space-x-2 pt-2">
-              <Checkbox 
-                id="stayLoggedIn" 
-                checked={stayLoggedIn} 
-                onCheckedChange={(checked) => setStayLoggedIn(checked === true)}
-              />
-              <Label htmlFor="stayLoggedIn" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                Permanecer logueado
-              </Label>
             </div>
           </CardContent>
           <CardFooter>
