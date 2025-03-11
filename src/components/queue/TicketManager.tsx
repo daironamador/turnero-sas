@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { toast } from 'sonner';
 import { useMutation } from "@tanstack/react-query";
@@ -103,7 +102,6 @@ const TicketManager: React.FC<TicketManagerProps> = ({
       recallTicket(params.ticket.id, counterNumber),
     onSuccess: (_, variables) => {
       toast.success(`Se ha vuelto a llamar al ticket ${variables.ticket.ticketNumber}`);
-      
       onTicketChange();
     },
     onError: (error: any) => {
@@ -159,15 +157,8 @@ const TicketManager: React.FC<TicketManagerProps> = ({
       }
     }
     
-    // Call the announceTicket function with the ticket information
-    announceTicket(
-      currentTicket.ticketNumber, 
-      counterName, 
-      currentTicket.redirectedFrom, 
-      originalRoomName
-    );
-    
     // Dispatch a custom event that the Display page can listen for
+    // Note: We're not using announceTicket locally anymore to ensure the audio only plays on Display
     const customEvent = new CustomEvent('ticket-recalled', {
       detail: {
         ticketNumber: currentTicket.ticketNumber,
@@ -208,15 +199,8 @@ const TicketManager: React.FC<TicketManagerProps> = ({
           }
         }
         
-        // Announce the ticket
-        announceTicket(
-          ticket.ticketNumber, 
-          counterName, 
-          ticket.redirectedFrom, 
-          originalRoomName
-        );
-        
         // Dispatch a custom event for the display
+        // Note: We're not using announceTicket locally anymore to ensure the audio only plays on Display
         const customEvent = new CustomEvent('ticket-recalled', {
           detail: {
             ticketNumber: ticket.ticketNumber,

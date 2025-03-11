@@ -110,14 +110,13 @@ export function useTicketUpdates({
     
     channel.subscribe();
     
-    // Handle the custom recall event from the Llamada page
+    // Handler for the custom recall event from the Llamada page
     const handleTicketRecalled = (event: CustomEvent) => {
       const { ticketNumber, counterName, redirectedFrom, originalRoomName } = event.detail;
       
       // Show notification
       if (roomsQuery.data) {
         // Create a notification ticket for display
-        // Use a valid ServiceType (OT - Otros Servicios) instead of an empty string
         const notificationTicket = {
           id: `recall-${Date.now()}`,
           ticketNumber: ticketNumber,
@@ -133,7 +132,7 @@ export function useTicketUpdates({
         setNewlyCalledTicket(notificationTicket);
       }
       
-      // Announce the recalled ticket
+      // Announce the recalled ticket using the speech synthesis
       announceTicket(
         ticketNumber,
         counterName,
