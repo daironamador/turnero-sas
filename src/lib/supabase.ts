@@ -11,6 +11,44 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// Comprueba si el usuario administrador existe, si no existe, lo crea
+export const setupDefaultUser = async () => {
+  try {
+    const adminEmail = 'admin1@example.com';
+    
+    // Verificar si el usuario ya existe intentando iniciar sesión
+    const { data: userData, error: userError } = await supabase.auth.signInWithPassword({
+      email: adminEmail,
+      password: '123456'
+    });
+    
+    // Si hay un error de credenciales inválidas, intentamos crear el usuario
+    if (userError && userError.message.includes('Invalid login credentials')) {
+      console.log('Creando usuario administrador predeterminado...');
+      const { data, error } = await supabase.auth.signUp({
+        email: adminEmail,
+        password: '123456',
+        options: {
+          data: {
+            role: 'admin'
+          }
+        }
+      });
+      
+      if (error) {
+        console.error('Error al crear usuario predeterminado:', error.message);
+      } else {
+        console.log('Usuario administrador creado exitosamente');
+      }
+    } else if (!userError) {
+      // Si se pudo iniciar sesión, cerramos sesión para que el usuario inicie sesión manualmente
+      await supabase.auth.signOut();
+    }
+  } catch (error) {
+    console.error('Error al verificar/crear usuario predeterminado:', error);
+  }
+};
+
 // Configuración de suscripciones en tiempo real para tickets
 export const setupRealtimeSubscriptions = () => {
   // Suscripción a cambios en tickets
