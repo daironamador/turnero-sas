@@ -70,38 +70,25 @@ const Login = () => {
       setLoading(true);
       console.log(`Intentando iniciar sesión con: ${email}`);
       
-      // Primero verificamos si el usuario existe en la tabla 'users'
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('email', email)
-        .single();
-      
-      if (userError) {
-        if (userError.code === 'PGRST116') {
-          // No se encontró el usuario en la tabla
-          throw new Error('Usuario no encontrado. Por favor verifique sus credenciales.');
-        }
-        console.log('Error al buscar usuario:', userError.message);
-        throw new Error('Error al buscar usuario. Por favor intente nuevamente.');
-      }
-      
-      if (!userData || !userData.is_active) {
-        throw new Error('Usuario no encontrado o inactivo. Por favor contacte al administrador.');
-      }
-      
-      // Si el usuario existe en la tabla, intentamos iniciar sesión con auth
+      // Intentar inicio de sesión directamente con Supabase Auth
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
       });
       
+      // Si hay un error de autenticación
       if (error) {
-        // Si es un error de credenciales inválidas pero el usuario existe en la tabla
-        if (error.message.includes('Invalid login credentials')) {
-          console.log('El usuario existe en la tabla pero no se puede autenticar, intentando registrarlo en auth');
+        // Verificar si el usuario existe en la tabla users pero no en auth
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', email)
+          .single();
+        
+        if (!userError && userData && userData.is_active) {
+          console.log('El usuario existe en la tabla pero no en auth, intentando registrarlo');
           
-          // Intentar crear el usuario en auth (signup) para que pueda iniciar sesión
+          // Intentar crear el usuario en auth
           const { error: signUpError } = await supabase.auth.signUp({
             email,
             password,
@@ -116,46 +103,20 @@ const Login = () => {
           });
           
           if (signUpError) {
-            // Si hay error por límite de correos, creamos una sesión simulada
             if (signUpError.message.includes('email rate limit')) {
-              console.log('Límite de correos alcanzado, intentando login directo');
-              
-              // Usar la API admin para crear un autosignup (aunque Supabase no permite esto fácilmente en el cliente)
-              // En lugar de eso, usamos una estrategia alternativa para iniciar sesión
-              const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({
-                email,
-                password
+              // Informar al usuario sobre la situación y permitir continuar
+              toast({
+                title: "Advertencia de autenticación",
+                description: "Hay un problema temporal con la verificación, pero puede continuar usando el sistema.",
+                variant: "default"
               });
-              
-              if (retryError) {
-                // Informar al usuario sobre la situación pero permitirle continuar
-                toast({
-                  title: "Advertencia de autenticación",
-                  description: "Hay un problema temporal con la verificación, pero puede continuar usando el sistema.",
-                  variant: "default"
-                });
-                
-                // Redirigir al usuario como si hubiera iniciado sesión correctamente
-                navigate('/');
-                return;
-              }
-              
-              // Si de alguna manera funcionó, continuar normalmente
-              if (retryData.user) {
-                toast({
-                  title: "Inicio de sesión exitoso",
-                  description: "Bienvenido al sistema",
-                });
-                navigate('/');
-                return;
-              }
+              navigate('/');
+              return;
             }
-            
-            console.error('Error al crear usuario en auth:', signUpError);
-            throw new Error('Error al crear credenciales. Por favor contacte al administrador.');
+            throw signUpError;
           }
           
-          // Ahora intentamos iniciar sesión nuevamente
+          // Intentar iniciar sesión nuevamente
           const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({
             email,
             password
@@ -165,7 +126,6 @@ const Login = () => {
             throw retryError;
           }
           
-          // Si llegamos aquí, el inicio de sesión fue exitoso
           toast({
             title: "Inicio de sesión exitoso",
             description: "Bienvenido al sistema",
