@@ -21,6 +21,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string>('viewer');
+  const [refreshCount, setRefreshCount] = useState(0);
 
   const refreshUser = async () => {
     try {
@@ -29,7 +30,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (error) {
         console.error('Error refreshing session:', error);
-        setLoading(false); // Ensure loading ends even on error
+        setLoading(false);
         return;
       }
       
@@ -42,12 +43,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('Session refreshed successfully:', newSession.user.email, 'with role:', newSession.user.user_metadata?.role || 'viewer');
       } else {
         console.log('No session found during refresh');
+        setUserRole('viewer');
       }
       
-      setLoading(false); // End loading state after refresh completes
     } catch (error) {
       console.error('Error getting session:', error);
-      setLoading(false); // Ensure loading ends even on error
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -58,7 +60,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await refreshUser();
       } catch (error) {
         console.error('Error getting session:', error);
-        setLoading(false); // Ensure loading ends even on error
+        setLoading(false);
       }
     };
 
@@ -92,11 +94,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.log('Token refreshed successfully');
         }
         
-        setLoading(false); // Always end loading after any auth state change
+        setLoading(false);
       }
     );
 
-    // Setup a periodic session check to prevent unexpected logouts
+    // Setup a periodic session check but only if we have a session
     const sessionCheckInterval = setInterval(async () => {
       // Only check if we believe we have a session and are not already loading
       if (session && !loading) {
@@ -109,7 +111,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           } else if (data.session === null && session !== null) {
             // Session was lost unexpectedly
             console.warn('Session lost unexpectedly, attempting to recover');
-            await refreshUser();
+            setRefreshCount(prev => prev + 1);
+            if (refreshCount < 3) { // Limit refresh attempts to prevent infinite loops
+              await refreshUser();
+            } else {
+              console.error('Maximum refresh attempts reached, clearing session');
+              setSession(null);
+              setUser(null);
+            }
           } else {
             console.log('Session check completed, session is valid');
           }
@@ -123,18 +132,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       subscription.unsubscribe();
       clearInterval(sessionCheckInterval);
     };
-  }, [session, loading]);
+  }, [session, loading, refreshCount]);
 
   const signOut = async () => {
     try {
       console.log('Signing out user...');
-      setLoading(true); // Start loading before signout
+      setLoading(true);
       await supabase.auth.signOut();
-      setLoading(false); // End loading after signout
+      setLoading(false);
       toast('Sesión cerrada correctamente');
     } catch (error) {
       console.error('Error signing out:', error);
-      setLoading(false); // Ensure loading ends even on error
+      setLoading(false);
       toast('Error al cerrar sesión');
     }
   };

@@ -24,10 +24,17 @@ const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast: uiToast } = useToast();
-  const { setSession } = useAuth();
+  const { setSession, user } = useAuth();
   
   // Get the return URL from location state (if available)
   const from = location.state?.from || '/';
+
+  // Redirect if user is already logged in
+  useEffect(() => {
+    if (user) {
+      navigate(from);
+    }
+  }, [user, navigate, from]);
 
   // Cargar configuración de la empresa para mostrar el logo
   useEffect(() => {
@@ -43,44 +50,6 @@ const Login = () => {
     loadSettings();
   }, []);
 
-  // Check if user is already logged in
-  useEffect(() => {
-    let mounted = true;
-    
-    const checkSession = async () => {
-      try {
-        const { data, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.error('Error checking session:', error);
-          return;
-        }
-        
-        if (mounted && data.session) {
-          console.log('User already logged in, redirecting to:', from);
-          navigate(from);
-        }
-      } catch (err) {
-        console.error('Unexpected error checking session:', err);
-      }
-    };
-    
-    checkSession();
-
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (mounted && session && event === 'SIGNED_IN') {
-        console.log('Auth state changed, user signed in');
-        navigate(from);
-      }
-    });
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, [navigate, from, setSession]);
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -95,17 +64,13 @@ const Login = () => {
       console.log(`Intentando iniciar sesión con: ${email}, mantener sesión: ${stayLoggedIn}`);
       
       // Set up session storage type based on user preference
-      if (stayLoggedIn) {
-        // Use 'local' storage for persistent sessions
-        console.log('Setting session storage to local for persistent session');
-        await supabase.auth.setSession({
-          access_token: '',
-          refresh_token: ''
-        });
+      if (!stayLoggedIn) {
+        // Use 'memory' storage for non-persistent sessions
+        supabase.auth.setAuth({ persistSession: false });
+        console.log('Using memory storage for session (will not persist)');
       } else {
-        // Use 'session' (memory) storage for non-persistent sessions
-        // This is the default in newer versions of Supabase
-        console.log('Using default session (memory) storage');
+        // Use 'local' storage for persistent sessions
+        console.log('Using local storage for session (will persist)');
       }
       
       // Sign in with Supabase Auth
@@ -117,69 +82,6 @@ const Login = () => {
       // If there's an auth error
       if (error) {
         console.log('Error de autenticación:', error.message);
-        
-        // Check if user exists in the users table but not in auth
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('email', email)
-          .single();
-        
-        if (!userError && userData && userData.is_active) {
-          console.log('El usuario existe en la tabla pero no en auth, intentando registrarlo');
-          
-          // Try to create user in auth
-          const { error: signUpError } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              data: {
-                name: userData.name,
-                username: userData.username,
-                role: userData.role,
-                service_ids: userData.service_ids || []
-              }
-            }
-          });
-          
-          if (signUpError) {
-            if (signUpError.message.includes('email rate limit')) {
-              // Inform user about the situation and allow them to continue
-              toast("Advertencia de autenticación: Hay un problema temporal con la verificación, pero puede continuar usando el sistema.");
-              
-              // Force refresh the session to ensure we have valid token
-              await supabase.auth.refreshSession();
-              
-              // Try to sign in again
-              const { error: retryError } = await supabase.auth.signInWithPassword({
-                email,
-                password
-              });
-              
-              if (!retryError) {
-                navigate(from);
-                return;
-              }
-            }
-            throw signUpError;
-          }
-          
-          // Try to sign in again
-          const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({
-            email,
-            password
-          });
-          
-          if (retryError) {
-            throw retryError;
-          }
-          
-          toast("Inicio de sesión exitoso. Bienvenido al sistema");
-          
-          navigate(from);
-          return;
-        }
-        
         throw error;
       }
       

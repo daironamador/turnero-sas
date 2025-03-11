@@ -18,10 +18,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshAttempted, setRefreshAttempted] = useState(false);
 
-  // Attempt to refresh the user session when the component mounts
+  // Attempt to refresh the user session when the component mounts, but only once
   useEffect(() => {
     const checkAndRefreshSession = async () => {
-      if (!user && !refreshAttempted) {
+      if (!user && !refreshAttempted && !loading) {
         console.log('No user found, attempting to refresh session');
         setIsRefreshing(true);
         try {
@@ -36,7 +36,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     };
     
     checkAndRefreshSession();
-  }, [user, refreshUser, refreshAttempted]);
+  }, [user, refreshUser, refreshAttempted, loading]);
 
   // Allow access to /display without authentication
   if (location.pathname === '/display') {
@@ -44,7 +44,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   // Show loading indicator only during initial auth check or session refresh
-  if (loading || isRefreshing) {
+  if ((loading && !refreshAttempted) || isRefreshing) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ocular-600"></div>
@@ -53,7 +53,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   // After refresh attempt completed, if user is still not logged in, redirect to login page
-  if (!user && refreshAttempted) {
+  if (!user) {
     console.log('User not authenticated, redirecting to login');
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
