@@ -22,34 +22,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string>('viewer');
   const [isPersistent, setIsPersistent] = useState<boolean>(() => {
-    // Check if persistence setting exists in localStorage
     const savedPersistence = localStorage.getItem('auth-persistence');
-    return savedPersistence ? JSON.parse(savedPersistence) : true; // Default to true for persistence
+    return savedPersistence ? JSON.parse(savedPersistence) : true;
   });
 
   const refreshUser = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
-      setUser(session?.user ?? null);
+      console.log('Refreshing user session...');
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
       
-      // Set user role from metadata
-      if (session?.user) {
-        setUserRole(session.user.user_metadata?.role || 'viewer');
+      if (currentSession) {
+        console.log('Session refreshed successfully:', currentSession.user.email);
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
+        
+        // Store the session in localStorage for persistence
+        localStorage.setItem('supabase-auth-session', JSON.stringify(currentSession));
+        
+        // Set user role from metadata
+        if (currentSession?.user) {
+          setUserRole(currentSession.user.user_metadata?.role || 'viewer');
+        }
+        return true;
+      } else {
+        console.log('No active session found during refresh');
+        return false;
       }
     } catch (error) {
-      console.error('Error getting session:', error);
+      console.error('Error refreshing user session:', error);
+      return false;
     }
   };
 
   const setPersistence = (isPersistent: boolean) => {
-    // Save persistence setting to localStorage
     localStorage.setItem('auth-persistence', JSON.stringify(isPersistent));
     setIsPersistent(isPersistent);
     
     // Update session persistence setting in Supabase
     if (session) {
-      // Use setSession instead of updateSession (which doesn't exist in this version)
       supabase.auth.setSession({
         access_token: session.access_token,
         refresh_token: session.refresh_token,
@@ -61,36 +71,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const getSession = async () => {
       setLoading(true);
       try {
-        // First try to get the session from Supabase (most reliable method)
+        console.log('Initializing auth session...');
+        
+        // First try to get the session from Supabase
         const { data: { session: currentSession } } = await supabase.auth.getSession();
         
         if (currentSession) {
-          // If we have a current valid session, use it
+          console.log('Active session found:', currentSession.user.email);
           setSession(currentSession);
           setUser(currentSession.user);
           setUserRole(currentSession.user.user_metadata?.role || 'viewer');
+          localStorage.setItem('supabase-auth-session', JSON.stringify(currentSession));
         } else {
+          console.log('No active session found, checking localStorage...');
           // If no current session, try to restore from localStorage
           const storedSession = localStorage.getItem('supabase-auth-session');
+          
           if (storedSession) {
-            const parsedSession = JSON.parse(storedSession);
-            const { data, error } = await supabase.auth.setSession({
-              access_token: parsedSession.access_token,
-              refresh_token: parsedSession.refresh_token,
-            });
-            
-            if (error) {
-              console.error('Error restoring session:', error);
+            console.log('Stored session found, attempting to restore...');
+            try {
+              const parsedSession = JSON.parse(storedSession);
+              const { data, error } = await supabase.auth.setSession({
+                access_token: parsedSession.access_token,
+                refresh_token: parsedSession.refresh_token,
+              });
+              
+              if (error) {
+                console.error('Error restoring session:', error);
+                localStorage.removeItem('supabase-auth-session');
+              } else if (data && data.session) {
+                console.log('Session restored successfully:', data.session.user.email);
+                setSession(data.session);
+                setUser(data.session.user);
+                setUserRole(data.session.user.user_metadata?.role || 'viewer');
+              }
+            } catch (parseError) {
+              console.error('Error parsing stored session:', parseError);
               localStorage.removeItem('supabase-auth-session');
-            } else if (data && data.session) {
-              setSession(data.session);
-              setUser(data.session.user);
-              setUserRole(data.session.user.user_metadata?.role || 'viewer');
             }
+          } else {
+            console.log('No stored session found');
           }
         }
       } catch (error) {
-        console.error('Error getting session:', error);
+        console.error('Error in session initialization:', error);
       } finally {
         setLoading(false);
       }
@@ -99,14 +123,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     getSession();
 
     // Set up auth state change listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('Auth state changed:', event, session?.user?.email);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
+      console.log('Auth state changed:', event, newSession?.user?.email);
       
-      // Store session in localStorage for all events that have a valid session
-      if (session) {
+      // Store session in localStorage for events that have a valid session
+      if (newSession) {
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-          console.log('Storing session in localStorage');
-          localStorage.setItem('supabase-auth-session', JSON.stringify(session));
+          console.log('Storing session in localStorage due to event:', event);
+          localStorage.setItem('supabase-auth-session', JSON.stringify(newSession));
         }
       }
       
@@ -116,12 +140,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.removeItem('supabase-auth-session');
       }
       
-      setSession(session);
-      setUser(session?.user ?? null);
+      setSession(newSession);
+      setUser(newSession?.user ?? null);
       
       // Update user role when auth state changes
-      if (session?.user) {
-        setUserRole(session.user.user_metadata?.role || 'viewer');
+      if (newSession?.user) {
+        setUserRole(newSession.user.user_metadata?.role || 'viewer');
       } else {
         setUserRole('viewer');
       }

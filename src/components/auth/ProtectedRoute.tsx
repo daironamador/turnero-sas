@@ -22,14 +22,27 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   useEffect(() => {
     const checkSession = async () => {
       try {
-        // First check if there's a valid session
+        console.log('ProtectedRoute: Checking session...');
+        // First check if there's a valid session with supabase
         const { data } = await supabase.auth.getSession();
-        if (!data.session && localStorage.getItem('supabase-auth-session')) {
-          // If we have a stored session but no active session, try to refresh
-          await refreshUser();
+        
+        if (data.session) {
+          console.log('ProtectedRoute: Valid session found');
+          setIsCheckingSession(false);
+          return;
+        }
+        
+        // If no active session, check localStorage and try to restore
+        const storedSession = localStorage.getItem('supabase-auth-session');
+        if (storedSession) {
+          console.log('ProtectedRoute: No active session, but found stored session, attempting to refresh');
+          const refreshed = await refreshUser();
+          console.log('ProtectedRoute: Session refresh result:', refreshed);
+        } else {
+          console.log('ProtectedRoute: No stored session found');
         }
       } catch (error) {
-        console.error('Error checking session:', error);
+        console.error('ProtectedRoute: Error checking session:', error);
       } finally {
         setIsCheckingSession(false);
       }
@@ -54,6 +67,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   // If user is not logged in, redirect to login page with return URL
   if (!user) {
+    console.log('ProtectedRoute: No user, redirecting to login', location.pathname);
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
 

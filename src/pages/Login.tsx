@@ -15,6 +15,7 @@ import { useAuth } from '@/contexts/AuthContext';
 
 const Login = () => {
   const [loading, setLoading] = useState(false);
+  const [sessionLoading, setSessionLoading] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +24,7 @@ const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  const { setPersistence } = useAuth();
+  const { setPersistence, refreshUser } = useAuth();
   
   // Get the return URL from location state (if available)
   const from = location.state?.from || '/';
@@ -45,25 +46,46 @@ const Login = () => {
   // Check if user is already logged in
   useEffect(() => {
     const checkSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (data.session) {
-        navigate(from, { replace: true });
+      console.log('Login: Checking for existing session...');
+      setSessionLoading(true);
+      
+      try {
+        // First try supabase session
+        const { data: sessionData } = await supabase.auth.getSession();
+        
+        if (sessionData.session) {
+          console.log('Login: Active session found, redirecting to:', from);
+          navigate(from, { replace: true });
+          return;
+        }
+        
+        // No active session, try to restore from localStorage
+        console.log('Login: No active session, checking localStorage...');
+        const storedSession = localStorage.getItem('supabase-auth-session');
+        
+        if (storedSession) {
+          console.log('Login: Found stored session, attempting to restore');
+          const restored = await refreshUser();
+          
+          if (restored) {
+            console.log('Login: Session restored successfully, redirecting to:', from);
+            navigate(from, { replace: true });
+            return;
+          } else {
+            console.log('Login: Failed to restore session, showing login form');
+          }
+        } else {
+          console.log('Login: No stored session found, showing login form');
+        }
+      } catch (error) {
+        console.error('Login: Error checking session:', error);
+      } finally {
+        setSessionLoading(false);
       }
     };
     
     checkSession();
-
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) {
-        navigate(from, { replace: true });
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [navigate, from]);
+  }, [navigate, from, refreshUser]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -174,6 +196,15 @@ const Login = () => {
       setLoading(false);
     }
   };
+
+  // If still checking session, show loading spinner
+  if (sessionLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ocular-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
