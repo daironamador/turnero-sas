@@ -2,7 +2,7 @@
 import React from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { CheckCheck, ChevronsUpDown, XCircle, Clock, User, Calendar } from 'lucide-react';
+import { CheckCheck, ChevronsUpDown, XCircle, Clock, User, Calendar, Volume2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ interface CurrentTicketProps {
   onComplete: () => void;
   onCancel: () => void;
   onRedirect: () => void;
+  onCallAgain?: () => void;
   isCompletePending: boolean;
   isCancelPending: boolean;
   isRedirectPending: boolean;
@@ -23,6 +24,7 @@ const CurrentTicket: React.FC<CurrentTicketProps> = ({
   onComplete,
   onCancel,
   onRedirect,
+  onCallAgain,
   isCompletePending,
   isCancelPending,
   isRedirectPending
@@ -75,7 +77,18 @@ const CurrentTicket: React.FC<CurrentTicketProps> = ({
             </div>
           </CardContent>
           
-          <CardFooter className="flex justify-end gap-2 pt-2">
+          <CardFooter className="flex flex-wrap justify-end gap-2 pt-2">
+            {onCallAgain && (
+              <Button 
+                variant="secondary" 
+                size="sm"
+                onClick={onCallAgain}
+                className="mr-auto"
+              >
+                Volver a Llamar
+                <Volume2 className="w-4 h-4 ml-2" />
+              </Button>
+            )}
             <Button 
               variant="destructive" 
               size="sm"

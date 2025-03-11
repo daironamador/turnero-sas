@@ -9,6 +9,7 @@ import {
   redirectTicket
 } from '@/services/ticketService';
 import { Service, Ticket, Room, ServiceType } from '@/lib/types';
+import { useSpeechSynthesis } from './display/useSpeechSynthesis';
 
 // Import our new component files
 import CurrentTicket from './CurrentTicket';
@@ -43,6 +44,7 @@ const TicketManager: React.FC<TicketManagerProps> = ({
 }) => {
   const [isRedirectDialogOpen, setIsRedirectDialogOpen] = useState(false);
   const [selectedService, setSelectedService] = useState<string | undefined>(undefined);
+  const { announceTicket } = useSpeechSynthesis();
 
   const nextTicket = waitingTickets.length > 0 ? waitingTickets[0] : undefined;
 
@@ -124,6 +126,34 @@ const TicketManager: React.FC<TicketManagerProps> = ({
     setIsRedirectDialogOpen(false);
   };
 
+  // Handle "Call Again" functionality
+  const handleCallAgain = () => {
+    if (!currentTicket || !counterName) return;
+    
+    // Find the original room name if this is a redirected ticket
+    let originalRoomName: string | undefined;
+    if (currentTicket.redirectedFrom) {
+      // Try to find the room with the matching service
+      const possibleRooms = rooms.filter(
+        r => r.service?.code === currentTicket.redirectedFrom
+      );
+      if (possibleRooms.length > 0) {
+        originalRoomName = possibleRooms[0].name;
+      } else {
+        originalRoomName = `servicio ${currentTicket.redirectedFrom}`;
+      }
+    }
+    
+    // Call the announceTicket function with the ticket information
+    announceTicket(
+      currentTicket.ticketNumber, 
+      counterName, 
+      currentTicket.redirectedFrom, 
+      originalRoomName
+    );
+    toast.success(`Volviendo a llamar al ticket ${currentTicket.ticketNumber}`);
+  };
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {/* Current Ticket */}
@@ -132,6 +162,7 @@ const TicketManager: React.FC<TicketManagerProps> = ({
         onComplete={handleComplete}
         onCancel={handleCancel}
         onRedirect={() => setIsRedirectDialogOpen(true)}
+        onCallAgain={currentTicket ? handleCallAgain : undefined}
         isCompletePending={completeTicketMutation.isPending}
         isCancelPending={cancelTicketMutation.isPending}
         isRedirectPending={redirectTicketMutation.isPending}
