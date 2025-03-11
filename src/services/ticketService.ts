@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabase';
 import { ServiceType, Ticket } from '@/lib/types';
 import { format } from 'date-fns';
@@ -235,28 +234,28 @@ export const getTodayStats = async () => {
   // Obtener conteos de tickets por estado para hoy
   const { data: waitingData, error: waitingError } = await supabase
     .from('tickets')
-    .select('count', { count: 'exact' })
+    .select('count', { count: 'exact', head: true })
     .eq('status', 'waiting')
     .gte('created_at', startOfDay)
     .lt('created_at', endOfDay);
 
   const { data: servingData, error: servingError } = await supabase
     .from('tickets')
-    .select('count', { count: 'exact' })
+    .select('count', { count: 'exact', head: true })
     .eq('status', 'serving')
     .gte('created_at', startOfDay)
     .lt('created_at', endOfDay);
 
   const { data: completedData, error: completedError } = await supabase
     .from('tickets')
-    .select('count', { count: 'exact' })
+    .select('count', { count: 'exact', head: true })
     .eq('status', 'completed')
     .gte('created_at', startOfDay)
     .lt('created_at', endOfDay);
 
   const { data: cancelledData, error: cancelledError } = await supabase
     .from('tickets')
-    .select('count', { count: 'exact' })
+    .select('count', { count: 'exact', head: true })
     .eq('status', 'cancelled')
     .gte('created_at', startOfDay)
     .lt('created_at', endOfDay);
@@ -266,15 +265,18 @@ export const getTodayStats = async () => {
     throw new Error('No se pudieron obtener las estadísticas de tickets');
   }
 
+  // Access count property from the response object, not from data array
+  const waitingCount = waitingData?.count || 0;
+  const servingCount = servingData?.count || 0;
+  const completedCount = completedData?.count || 0;
+  const cancelledCount = cancelledData?.count || 0;
+
   return {
-    waiting: waitingData?.count || 0,
-    serving: servingData?.count || 0,
-    completed: completedData?.count || 0,
-    cancelled: cancelledData?.count || 0,
-    total: (waitingData?.count || 0) + 
-           (servingData?.count || 0) + 
-           (completedData?.count || 0) + 
-           (cancelledData?.count || 0)
+    waiting: waitingCount,
+    serving: servingCount,
+    completed: completedCount,
+    cancelled: cancelledCount,
+    total: waitingCount + servingCount + completedCount + cancelledCount
   };
 };
 

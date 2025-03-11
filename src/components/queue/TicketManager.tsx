@@ -35,7 +35,8 @@ import {
   callTicket, 
   completeTicket, 
   cancelTicket, 
-  redirectTicket 
+  redirectTicket,
+  updateTicketStatus
 } from '@/services/ticketService';
 
 interface TicketManagerProps {
