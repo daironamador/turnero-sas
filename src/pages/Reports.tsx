@@ -13,11 +13,12 @@ import ReportsTable from '@/components/reports/ReportsTable';
 import { getTicketsReport } from '@/services/ticketService';
 import { Ticket } from '@/lib/types';
 import { printReport } from '@/utils/printUtils';
+import { DateRange } from 'react-day-picker';
 
 const Reports: React.FC = () => {
   const { toast } = useToast();
   const [reportType, setReportType] = useState<'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom'>('daily');
-  const [customRange, setCustomRange] = useState<{from: Date, to: Date} | undefined>(undefined);
+  const [customRange, setCustomRange] = useState<DateRange | undefined>(undefined);
   const [isCustomRangeOpen, setIsCustomRangeOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -77,7 +78,7 @@ const Reports: React.FC = () => {
         };
         break;
       case 'custom':
-        if (customRange) {
+        if (customRange?.from) {
           newDateRange = {
             from: startOfDay(customRange.from),
             to: endOfDay(customRange.to || customRange.from)
@@ -158,22 +159,19 @@ const Reports: React.FC = () => {
                         initialFocus
                         mode="range"
                         defaultMonth={dateRange.from}
-                        selected={{
-                          from: customRange?.from || dateRange.from,
-                          to: customRange?.to || dateRange.to,
-                        }}
-                        onSelect={(range) => {
-                          if (range?.from) {
-                            const newRange = {
-                              from: startOfDay(range.from),
-                              to: endOfDay(range.to || range.from)
-                            };
-                            setCustomRange(range);
-                            setDateRange(newRange);
+                        selected={customRange}
+                        onSelect={(selectedRange) => {
+                          setCustomRange(selectedRange);
+                          if (selectedRange?.from) {
+                            setDateRange({
+                              from: startOfDay(selectedRange.from),
+                              to: endOfDay(selectedRange.to || selectedRange.from)
+                            });
                           }
                           setIsCustomRangeOpen(false);
                         }}
                         numberOfMonths={2}
+                        className="pointer-events-auto"
                       />
                     </PopoverContent>
                   </Popover>
