@@ -110,8 +110,27 @@ export function useTicketUpdates({
     
     channel.subscribe();
     
+    // Handle the custom recall event from the Llamada page
+    const handleTicketRecalled = (event: CustomEvent) => {
+      const { ticketNumber, counterName, redirectedFrom, originalRoomName } = event.detail;
+      
+      // Announce the recalled ticket
+      announceTicket(
+        ticketNumber,
+        counterName,
+        redirectedFrom,
+        originalRoomName
+      );
+      
+      console.info('Ticket recalled event received:', event.detail);
+    };
+    
+    // Add event listener for the custom event
+    window.addEventListener('ticket-recalled', handleTicketRecalled as EventListener);
+    
     return () => {
       supabase.removeChannel(channel);
+      window.removeEventListener('ticket-recalled', handleTicketRecalled as EventListener);
     };
   }, [
     queryClient, 

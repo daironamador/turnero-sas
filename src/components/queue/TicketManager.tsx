@@ -165,6 +165,18 @@ const TicketManager: React.FC<TicketManagerProps> = ({
       currentTicket.redirectedFrom, 
       originalRoomName
     );
+    
+    // Dispatch a custom event that the Display page can listen for
+    const recallEvent = new CustomEvent('ticket-recalled', {
+      detail: {
+        ticketNumber: currentTicket.ticketNumber,
+        counterName: counterName,
+        redirectedFrom: currentTicket.redirectedFrom,
+        originalRoomName: originalRoomName
+      }
+    });
+    window.dispatchEvent(recallEvent);
+    
     toast.success(`Volviendo a llamar al ticket ${currentTicket.ticketNumber}`);
   };
 
