@@ -5,38 +5,3 @@ import type { Database } from './types';
 
 // Export the singleton instance
 export { supabase };
-
-// Función para crear un nuevo usuario
-export const createUser = async (email: string, password: string, userData: any) => {
-  try {
-    // Create user in Auth first and only in Auth
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          name: userData.name,
-          username: userData.username,
-          role: userData.role,
-          service_ids: userData.serviceIds
-        }
-      }
-    });
-    
-    // If there's an error during signup
-    if (signUpError) {
-      console.log('SignUp error:', signUpError.message);
-      return { user: null, error: signUpError, message: signUpError.message };
-    }
-    
-    // If signup is successful, return the user
-    return { 
-      user: signUpData.user, 
-      error: null,
-      message: 'Usuario creado correctamente en sistema de autenticación. Se ha enviado un correo de verificación.'
-    };
-  } catch (error: any) {
-    console.error('Error inesperado al crear usuario:', error);
-    return { user: null, error, message: error.message };
-  }
-};

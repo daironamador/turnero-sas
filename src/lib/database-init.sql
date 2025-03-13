@@ -48,18 +48,6 @@ CREATE TABLE IF NOT EXISTS company_settings (
   display_message TEXT
 );
 
--- Create users table
-CREATE TABLE IF NOT EXISTS users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  username TEXT NOT NULL UNIQUE,
-  name TEXT NOT NULL,
-  email TEXT NOT NULL,
-  role TEXT NOT NULL DEFAULT 'operator',
-  is_active BOOLEAN DEFAULT true,
-  service_ids UUID[] DEFAULT '{}',
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
-);
-
 -- Insert default services
 INSERT INTO services (code, name, description, is_active)
 VALUES 

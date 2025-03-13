@@ -90,8 +90,7 @@ const TicketManager: React.FC<TicketManagerProps> = ({
       ticket: recallTicket
     }, {
       onSuccess: () => {
-        // For announcement, ensure counterNumber is parsed as a number if needed
-        // This avoids type mismatch issues with the announcement system
+        // For announcement, ensure we use the right format for announcement
         announceTicket({
           ...ticket,
           counterNumber: counterNumber, // Keep as string for announcement

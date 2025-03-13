@@ -1,8 +1,7 @@
-
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Room, Ticket } from '@/lib/types';
 
-export function useTicketAnnouncer() {
+export const useTicketAnnouncer = () => {
   const [ticketChannel, setTicketChannel] = useState<BroadcastChannel | null>(null);
   const [announcementQueue, setAnnouncementQueue] = useState<any[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -90,7 +89,7 @@ export function useTicketAnnouncer() {
     }
   }, [announcementQueue, isProcessing, ticketChannel]);
 
-  const announceTicket = (ticket: Ticket, counterName: string | undefined, rooms: Room[]) => {
+  const announceTicket = useCallback((ticket: Ticket, counterName: string, rooms: Room[]) => {
     if (!counterName) {
       console.error("Cannot announce ticket: counterName is undefined");
       return;
@@ -135,21 +134,20 @@ export function useTicketAnnouncer() {
       return;
     }
     
-    // Reset retry counter for this ticket
-    if (ticket.id) {
+    // Reset retry counter for this ticket if there is an ID
+    if (ticket && ticket.id) {
       resendAttemptsRef.current.set(ticket.id, 0);
     }
     
     try {
       ticketChannel.postMessage(announcement);
-      console.log("Broadcast ticket announcement sent successfully");
+      console.log('Ticket announcement sent:', announcement);
+      return true;
     } catch (error) {
-      console.error("Failed to broadcast ticket announcement:", error);
-      
-      // If sending fails, add to queue
-      setAnnouncementQueue(prev => [...prev, announcement]);
+      console.error('Failed to send ticket announcement:', error);
+      return false;
     }
-  };
+  }, []);
 
   return { ticketChannel, announceTicket };
-}
+};
