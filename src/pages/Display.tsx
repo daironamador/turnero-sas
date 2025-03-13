@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef } from 'react';
 import DisplayScreen from '@/components/queue/DisplayScreen';
 import { Helmet } from 'react-helmet';
@@ -18,6 +17,10 @@ const Display: React.FC = () => {
     try {
       // Force reset speech synthesis to clear any stuck state
       window.speechSynthesis.cancel();
+      
+      // Create voices list to force loading
+      const voices = window.speechSynthesis.getVoices();
+      console.log(`Available voices: ${voices.length}`);
       
       // Initialize with a silent utterance to grant permissions
       const testUtterance = new SpeechSynthesisUtterance(".");
@@ -39,20 +42,15 @@ const Display: React.FC = () => {
       // Speak the test utterance
       window.speechSynthesis.speak(testUtterance);
       
-      // Force load voices
-      window.speechSynthesis.getVoices();
-      
-      // Additional initialization to ensure it's ready
+      // Attempt to speak something more substantial after a delay
       setTimeout(() => {
-        if (window.speechSynthesis) {
-          window.speechSynthesis.cancel(); // Make sure queue is clear
-          console.log("Audio system ready for announcements");
-          
-          // Try to preload voices
-          const voices = window.speechSynthesis.getVoices();
-          console.log(`Preloaded ${voices.length} voices`);
-        }
-      }, 1000);
+        const confirmUtterance = new SpeechSynthesisUtterance("Sistema listo");
+        confirmUtterance.volume = 0.8;
+        confirmUtterance.rate = 0.9;
+        confirmUtterance.lang = 'es-419';
+        window.speechSynthesis.speak(confirmUtterance);
+        console.log("Audio confirmation initiated");
+      }, 2000);
     } catch (error) {
       console.error("Failed to initialize audio:", error);
       toast.error("Error al inicializar el audio. Intente recargar la página.");
@@ -136,8 +134,17 @@ const Display: React.FC = () => {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     
+    // Create a periodic check to keep the synthesis system alive
+    const keepAliveInterval = setInterval(() => {
+      if (window.speechSynthesis && !window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel(); // Prevent any stuck states
+        console.log("Periodic speech synthesis reset");
+      }
+    }, 30000); // Every 30 seconds
+    
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(keepAliveInterval);
     };
   }, []);
 

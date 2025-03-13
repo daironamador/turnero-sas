@@ -43,6 +43,19 @@ export const formatTicketNumber = (ticketNumber: string): string => {
 
 // Find the best Spanish voice from available voices
 export const findBestSpanishVoice = (voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | undefined => {
+  console.log(`Finding best Spanish voice from ${voices.length} available voices`);
+  
+  if (voices.length === 0) {
+    // If no voices are available, return undefined
+    console.warn("No voices available for selection");
+    return undefined;
+  }
+  
+  // Log all available voices for debugging
+  voices.forEach(voice => {
+    console.log(`Voice: ${voice.name}, Language: ${voice.lang}, Default: ${voice.default}`);
+  });
+  
   // Try to find a Spanish Latin American voice first
   const latinAmericanVoices = voices.filter(voice => 
     (voice.lang.includes('es-MX') || 
@@ -54,6 +67,7 @@ export const findBestSpanishVoice = (voices: SpeechSynthesisVoice[]): SpeechSynt
   
   // If we find Latin American voices, prioritize female voices
   if (latinAmericanVoices.length > 0) {
+    console.log(`Found ${latinAmericanVoices.length} Latin American Spanish voices`);
     const femaleVoice = latinAmericanVoices.find(v => 
       v.name.includes('Female') || 
       v.name.includes('female') || 
@@ -74,6 +88,7 @@ export const findBestSpanishVoice = (voices: SpeechSynthesisVoice[]): SpeechSynt
     voices.filter(voice => voice.lang.includes('es'));
   
   if (availableSpanishVoices.length > 0) {
+    console.log(`Found ${availableSpanishVoices.length} Spanish voices`);
     const femaleVoice = availableSpanishVoices.find(v => 
       v.name.includes('Female') || 
       v.name.includes('female') || 
@@ -82,5 +97,7 @@ export const findBestSpanishVoice = (voices: SpeechSynthesisVoice[]): SpeechSynt
     return femaleVoice || availableSpanishVoices[0];
   }
   
-  return undefined;
+  // Last fallback - use any available voice, preferably default
+  console.log("No Spanish voices found, using any available voice");
+  return voices.find(v => v.default) || voices[0];
 };

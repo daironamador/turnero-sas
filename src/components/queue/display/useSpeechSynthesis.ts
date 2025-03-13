@@ -1,5 +1,5 @@
 
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useSpeechInit } from './hooks/useSpeechInit';
 import { useSpeechQueue } from './hooks/useSpeechQueue';
 import { formatTicketNumber } from './utils/voiceUtils';
@@ -11,6 +11,14 @@ export function useSpeechSynthesis() {
     voices, 
     setIsSpeaking: (speaking) => setIsSpeakingState(speaking) 
   });
+  
+  // Initialize speech synthesis when component mounts
+  useEffect(() => {
+    if (!isReady) {
+      console.log("Initializing speech synthesis on mount");
+      initialize();
+    }
+  }, [isReady, initialize]);
 
   // Function to announce ticket via speech synthesis
   const announceTicket = useCallback((

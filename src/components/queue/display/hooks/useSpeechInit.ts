@@ -14,17 +14,22 @@ export function useSpeechInit() {
       
       const availableVoices = window.speechSynthesis.getVoices();
       setVoices(availableVoices);
-      synthesisReadyRef.current = true;
-      setIsReadyState(true);
       
-      console.log("Voice synthesis ready. Loaded voices:", availableVoices.length);
-      
-      // Log available Spanish voices
-      const spanishVoices = availableVoices.filter(v => v.lang.includes('es'));
-      if (spanishVoices.length) {
-        console.log("Available Spanish voices:", spanishVoices.map(v => `${v.name} (${v.lang})`).join(', '));
+      if (availableVoices.length > 0) {
+        synthesisReadyRef.current = true;
+        setIsReadyState(true);
+        
+        console.log("Voice synthesis ready. Loaded voices:", availableVoices.length);
+        
+        // Log available Spanish voices
+        const spanishVoices = availableVoices.filter(v => v.lang.includes('es'));
+        if (spanishVoices.length) {
+          console.log("Available Spanish voices:", spanishVoices.map(v => `${v.name} (${v.lang})`).join(', '));
+        } else {
+          console.warn("No Spanish voices found, will use default voice");
+        }
       } else {
-        console.warn("No Spanish voices found");
+        console.warn("No voices loaded yet");
       }
     }
   };
@@ -40,7 +45,7 @@ export function useSpeechInit() {
     forceLoadVoices();
     
     // Setup event handler for when voices are loaded later
-    if (window.speechSynthesis?.onvoiceschanged !== undefined) {
+    if (window.speechSynthesis) {
       window.speechSynthesis.onvoiceschanged = forceLoadVoices;
     }
     
@@ -51,6 +56,14 @@ export function useSpeechInit() {
         forceLoadVoices();
       }
     }, 1000);
+    
+    // Additional attempt after browser has had more time to initialize
+    const secondLoadVoicesTimeout = setTimeout(() => {
+      if (!synthesisReadyRef.current && window.speechSynthesis) {
+        console.log("Second retry of voice loading...");
+        forceLoadVoices();
+      }
+    }, 3000);
     
     // Reset the speech synthesis periodically to avoid Chrome bugs
     const resetSynthesisInterval = setInterval(() => {
@@ -84,6 +97,7 @@ export function useSpeechInit() {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       clearInterval(resetSynthesisInterval);
       clearTimeout(loadVoicesTimeout);
+      clearTimeout(secondLoadVoicesTimeout);
     };
   }, []);
 
@@ -96,6 +110,16 @@ export function useSpeechInit() {
         forceLoadVoices(); // Force voice loading
         synthesisReadyRef.current = true;
         setIsReadyState(true);
+        
+        // Speak a brief silent utterance to request permissions
+        try {
+          const testUtterance = new SpeechSynthesisUtterance(" ");
+          testUtterance.volume = 0.1;
+          testUtterance.rate = 1;
+          window.speechSynthesis.speak(testUtterance);
+        } catch (e) {
+          console.error("Error initializing speech:", e);
+        }
       }
     }
   };

@@ -48,15 +48,20 @@ const TicketNotification: React.FC<TicketNotificationProps> = ({ ticket, rooms }
   // Effect to announce the ticket when it first appears
   useEffect(() => {
     if (ticket && !announcementMade.current) {
-      // Announce the ticket using speech synthesis
-      if (ticket.redirectedFrom) {
-        announceTicket(displayNumber, roomName, ticket.redirectedFrom, originalRoomName);
-      } else {
-        announceTicket(displayNumber, roomName);
-      }
+      console.log(`Attempting to announce ticket ${displayNumber} to ${roomName}`);
       
-      // Mark that we've announced this ticket
-      announcementMade.current = true;
+      // Slight delay to ensure speech synthesis is ready
+      setTimeout(() => {
+        // Announce the ticket using speech synthesis
+        if (ticket.redirectedFrom) {
+          announceTicket(displayNumber, roomName, ticket.redirectedFrom, originalRoomName);
+        } else {
+          announceTicket(displayNumber, roomName);
+        }
+        
+        // Mark that we've announced this ticket
+        announcementMade.current = true;
+      }, 300);
       
       // Reset the flag when the component unmounts
       return () => {

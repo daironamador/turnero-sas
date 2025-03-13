@@ -115,6 +115,16 @@ export function useSpeechQueue({ voices, setIsSpeaking }: UseSpeechQueueProps) {
         
         // Ensure utterance is spoken
         window.speechSynthesis.speak(speech);
+        
+        // Double-check that speech synthesis is active after a short delay
+        setTimeout(() => {
+          if (!window.speechSynthesis.speaking && processingRef.current) {
+            console.log("Speech didn't start properly, retrying...");
+            window.speechSynthesis.cancel();
+            window.speechSynthesis.speak(speech);
+          }
+        }, 500);
+        
       } catch (error) {
         console.error("Error speaking:", error);
         processingRef.current = false;
@@ -131,6 +141,7 @@ export function useSpeechQueue({ voices, setIsSpeaking }: UseSpeechQueueProps) {
 
   // Queue a new text to be spoken
   const queueSpeech = useCallback((text: string) => {
+    console.log("Queueing speech:", text);
     speakingQueue.current.push(text);
     
     // Start processing queue if not already processing
@@ -141,7 +152,7 @@ export function useSpeechQueue({ voices, setIsSpeaking }: UseSpeechQueueProps) {
 
   return {
     queueSpeech,
-    isProcessing: () => isProcessingState,
-    queueLength: () => speakingQueue.current.length
+    isProcessing: isProcessingState,
+    queueLength: speakingQueue.current.length
   };
 }
