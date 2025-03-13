@@ -36,8 +36,9 @@ export function useTicketUpdates({
     redirectedFrom?: string, 
     originalRoomName?: string
   ) => {
-    // Create a unique key for this announcement to prevent duplicates
-    const announcementKey = `${ticket.id}-${Date.now()}`;
+    // Check if the ticket already has a messageId from the BroadcastChannel
+    // If not, create a unique key for this announcement to prevent duplicates
+    const announcementKey = ticket.id || `${ticket.ticketNumber}-${Date.now()}`;
     
     // Check if we've already processed this specific announcement recently
     if (processedAnnouncements.current.has(announcementKey)) {
@@ -131,18 +132,35 @@ export function useTicketUpdates({
     channel.subscribe();
     
     let ticketChannel: BroadcastChannel | null = null;
+    let processedMessageIds = new Set<string>();
     
     if (typeof BroadcastChannel !== 'undefined') {
       try {
         ticketChannel = new BroadcastChannel('ticket-announcements');
-        console.log('BroadcastChannel for ticket-announcements created successfully');
+        console.log('BroadcastChannel for ticket-announcements created successfully in Display');
         
         ticketChannel.onmessage = (event) => {
           if (!event.data) return;
           
           console.log('Received broadcast message in useTicketUpdates:', event.data.type);
           
-          if (event.data.type === 'announce-ticket') {
+          // Check if this message has a unique ID and if we've seen it before
+          if (event.data.messageId && processedMessageIds.has(event.data.messageId)) {
+            console.log(`Skipping duplicate message with ID: ${event.data.messageId}`);
+            return;
+          }
+          
+          // Add this message ID to the processed set
+          if (event.data.messageId) {
+            processedMessageIds.add(event.data.messageId);
+            
+            // Clean up the set after a while to prevent memory leaks
+            setTimeout(() => {
+              processedMessageIds.delete(event.data.messageId);
+            }, 30000); // Keep track for 30 seconds
+          }
+          
+          if (event.data.type === 'announce-ticket' && !processingAnnouncement) {
             const { ticket, counterName, redirectedFrom, originalRoomName } = event.data;
             
             if (ticket && counterName) {
@@ -182,7 +200,8 @@ export function useTicketUpdates({
     announceTicket, 
     setNewlyCalledTicket,
     lastAnnounced,
-    setLastAnnounced
+    setLastAnnounced,
+    processingAnnouncement
   ]);
   
   useEffect(() => {

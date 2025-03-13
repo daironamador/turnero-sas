@@ -54,8 +54,15 @@ export const useTicketAnnouncer = () => {
       
       // Send the announcement
       try {
-        ticketChannel.postMessage(nextAnnouncement);
-        console.log("Sent announcement from queue:", nextAnnouncement.ticket?.ticketNumber);
+        // Add a unique timestamp to prevent duplicate filtering
+        const announcementWithTimestamp = {
+          ...nextAnnouncement,
+          messageId: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+          timestamp: Date.now()
+        };
+        
+        ticketChannel.postMessage(announcementWithTimestamp);
+        console.log("Sent announcement from queue:", nextAnnouncement.ticket?.ticketNumber, "with ID:", announcementWithTimestamp.messageId);
         
         // Add a resend attempt after a delay if we don't receive acknowledgement
         const ticketId = nextAnnouncement.ticket?.id;
@@ -141,8 +148,14 @@ export const useTicketAnnouncer = () => {
     }
     
     try {
-      ticketChannel.postMessage(announcement);
-      console.log('Ticket announcement sent:', announcement);
+      // Add a unique messageId to prevent duplicate processing
+      const announcementWithId = {
+        ...announcement,
+        messageId: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+      };
+      
+      ticketChannel.postMessage(announcementWithId);
+      console.log('Ticket announcement sent:', announcementWithId);
       return true;
     } catch (error) {
       console.error('Failed to send ticket announcement:', error);
