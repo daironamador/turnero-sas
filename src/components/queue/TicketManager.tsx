@@ -43,6 +43,13 @@ const TicketManager: React.FC<TicketManagerProps> = ({
     callTicketMutation.mutate({ 
       ticketId: nextTicket.id, 
       counterNumber 
+    }, {
+      onSuccess: () => {
+        // Announce the ticket after successful call
+        if (counterName) {
+          announceTicket(nextTicket, counterName, rooms);
+        }
+      }
     });
   };
 
