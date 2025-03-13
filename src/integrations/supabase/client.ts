@@ -3,5 +3,111 @@
 import supabase from '@/lib/supabaseInit';
 import type { Database } from './types';
 
+// Function to create a new user
+export const createUser = async (
+  email: string,
+  password: string,
+  userData: {
+    name?: string;
+    username?: string;
+    role?: 'admin' | 'operator' | 'viewer';
+    serviceIds?: string[];
+  }
+) => {
+  try {
+    // Sign up the user with Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+
+    if (authError) {
+      // Check if it's an email rate limit error (this happens in development with the same email)
+      if (authError.message.includes('rate limit')) {
+        console.warn('Email rate limit detected, continuing with user creation');
+        
+        // Insert user data in the users table
+        const { data: userData2, error: dbError } = await supabase
+          .from('users')
+          .insert({
+            email: email,
+            name: userData.name || '',
+            username: userData.username || '',
+            role: userData.role || 'operator',
+            service_ids: userData.serviceIds || [],
+            is_active: true
+          })
+          .select()
+          .single();
+          
+        if (dbError) {
+          console.error('Error creating user in database:', dbError);
+          return { 
+            user: null, 
+            error: { 
+              name: 'DatabaseError', 
+              message: dbError.message 
+            }, 
+            message: null 
+          };
+        }
+        
+        return { 
+          user: userData2, 
+          error: { 
+            name: 'EmailRateLimit', 
+            message: 'Usuario creado, pero no se pudo enviar el email de confirmación debido a límites de prueba.' 
+          },
+          message: 'Usuario creado con advertencia'
+        };
+      }
+      
+      console.error('Error signing up user:', authError);
+      return { user: null, error: authError, message: null };
+    }
+
+    // If the auth signup was successful, create an entry in the users table
+    if (authData.user) {
+      const { data: userData2, error: dbError } = await supabase
+        .from('users')
+        .insert({
+          id: authData.user.id,
+          email: email,
+          name: userData.name || '',
+          username: userData.username || '',
+          role: userData.role || 'operator',
+          service_ids: userData.serviceIds || [],
+          is_active: true
+        })
+        .select()
+        .single();
+        
+      if (dbError) {
+        console.error('Error creating user in database:', dbError);
+        return { user: null, error: dbError, message: null };
+      }
+      
+      return { 
+        user: userData2, 
+        error: null, 
+        message: 'Usuario creado exitosamente' 
+      };
+    }
+    
+    return { 
+      user: null, 
+      error: { name: 'UnknownError', message: 'Error desconocido al crear usuario' }, 
+      message: null 
+    };
+  } catch (error: any) {
+    console.error('Unexpected error creating user:', error);
+    return { 
+      user: null, 
+      error: { name: 'UnexpectedError', message: error.message }, 
+      message: null 
+    };
+  }
+};
+
 // Export the singleton instance
 export { supabase };

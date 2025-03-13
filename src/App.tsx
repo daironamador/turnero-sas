@@ -5,7 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useEffect } from "react";
-import { setupRealtimeSubscriptions, setupDefaultUser } from "@/lib/supabase";
+import { setupRealtimeSubscriptions } from "@/lib/supabase";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 
@@ -26,9 +26,8 @@ import Notification from "./pages/Notification";
 const queryClient = new QueryClient();
 
 const App = () => {
-  // Setup default user and realtime subscriptions
+  // Setup realtime subscriptions
   useEffect(() => {
-    setupDefaultUser();
     const cleanup = setupRealtimeSubscriptions();
     return () => cleanup();
   }, []);
