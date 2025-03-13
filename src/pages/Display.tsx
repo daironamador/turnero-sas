@@ -16,28 +16,41 @@ const Display: React.FC = () => {
     }
     
     try {
-      // Initialize with a silent utterance to grant permissions
-      const testUtterance = new SpeechSynthesisUtterance("");
-      testUtterance.volume = 0; // Silent test
-      
       // Force reset speech synthesis to clear any stuck state
       window.speechSynthesis.cancel();
       
-      // Test with a small utterance
+      // Initialize with a silent utterance to grant permissions
+      const testUtterance = new SpeechSynthesisUtterance(".");
+      testUtterance.volume = 0.1; // Very quiet test
+      testUtterance.rate = 1;
+      testUtterance.lang = 'es-419'; // Set language to Spanish
+      
+      // Set event handlers to track initialization
+      testUtterance.onend = () => {
+        console.log("Audio system initialized successfully");
+        audioInitialized.current = true;
+      };
+      
+      testUtterance.onerror = (error) => {
+        console.error("Error initializing audio:", error);
+        toast.error("Error al inicializar el audio. Intente recargar la página.");
+      };
+      
+      // Speak the test utterance
       window.speechSynthesis.speak(testUtterance);
       
       // Force load voices
       window.speechSynthesis.getVoices();
-      
-      // Set flag
-      audioInitialized.current = true;
-      console.log("Audio system initialized successfully");
       
       // Additional initialization to ensure it's ready
       setTimeout(() => {
         if (window.speechSynthesis) {
           window.speechSynthesis.cancel(); // Make sure queue is clear
           console.log("Audio system ready for announcements");
+          
+          // Try to preload voices
+          const voices = window.speechSynthesis.getVoices();
+          console.log(`Preloaded ${voices.length} voices`);
         }
       }, 1000);
     } catch (error) {
@@ -70,17 +83,23 @@ const Display: React.FC = () => {
       if (window.speechSynthesis) {
         console.log("Speech synthesis is supported in this browser");
         
-        // Auto-initialize audio immediately and then again after a timeout
-        // This helps with some browsers that might not initialize correctly the first time
+        // Auto-initialize audio immediately
         initializeAudio();
         
-        // Try again after a delay to ensure it's properly initialized
+        // Try again after delays to ensure it's properly initialized
         setTimeout(() => {
           if (!audioInitialized.current) {
-            console.log("Trying audio initialization again...");
+            console.log("Trying audio initialization again after 2s...");
             initializeAudio();
           }
         }, 2000);
+        
+        setTimeout(() => {
+          if (!audioInitialized.current) {
+            console.log("Final attempt to initialize audio after 5s...");
+            initializeAudio();
+          }
+        }, 5000);
       } else {
         console.error("Speech synthesis is NOT supported in this browser - voice announcements will not work");
         toast.error("Su navegador no soporta la síntesis de voz - los anuncios de voz no funcionarán");
@@ -91,14 +110,25 @@ const Display: React.FC = () => {
     const handleVisibilityChange = () => {
       if (window.speechSynthesis) {
         if (document.hidden) {
-          window.speechSynthesis.pause();
+          // If we're speaking and the tab becomes hidden, pause the speech
+          if (window.speechSynthesis.speaking) {
+            window.speechSynthesis.pause();
+            console.log("Speech paused due to tab visibility change");
+          }
         } else {
+          // Resume speech when tab becomes visible again
           window.speechSynthesis.resume();
+          console.log("Speech resumed due to tab visibility change");
           
-          // When tab becomes visible again, re-initialize audio
+          // When tab becomes visible again, ensure audio system is ready
           if (!window.speechSynthesis.speaking && !window.speechSynthesis.pending) {
             console.log("Tab visible again - ensuring audio system is ready");
             window.speechSynthesis.cancel(); // Clear any stuck utterances
+            
+            // Try to re-initialize if needed
+            if (!audioInitialized.current) {
+              initializeAudio();
+            }
           }
         }
       }

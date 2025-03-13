@@ -1,5 +1,5 @@
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { findBestSpanishVoice } from '../utils/voiceUtils';
 
 interface UseSpeechQueueProps {
@@ -10,6 +10,9 @@ interface UseSpeechQueueProps {
 export function useSpeechQueue({ voices, setIsSpeaking }: UseSpeechQueueProps) {
   const speakingQueue = useRef<string[]>([]);
   const processingRef = useRef(false);
+  const [isProcessingState, setIsProcessingState] = useState(false);
+  const attemptCountRef = useRef<Map<string, number>>(new Map());
+  const maxAttempts = 3;
   
   // Process the speech queue
   const processQueue = useCallback(() => {
@@ -20,11 +23,13 @@ export function useSpeechQueue({ voices, setIsSpeaking }: UseSpeechQueueProps) {
     
     if (speakingQueue.current.length > 0 && !processingRef.current) {
       processingRef.current = true;
+      setIsProcessingState(true);
       const text = speakingQueue.current.shift()!;
       
       // Skip empty text
       if (!text || text.trim() === '') {
         processingRef.current = false;
+        setIsProcessingState(false);
         setTimeout(processQueue, 100);
         return;
       }
@@ -35,7 +40,7 @@ export function useSpeechQueue({ voices, setIsSpeaking }: UseSpeechQueueProps) {
         
         const speech = new SpeechSynthesisUtterance(text);
         speech.volume = 1;
-        speech.rate = 0.9;
+        speech.rate = 0.9; // Slightly slower for better clarity
         speech.pitch = 1;
         
         // Find the best voice for Spanish
@@ -44,6 +49,7 @@ export function useSpeechQueue({ voices, setIsSpeaking }: UseSpeechQueueProps) {
         if (bestVoice) {
           speech.voice = bestVoice;
           speech.lang = bestVoice.lang;
+          console.log(`Using voice: ${bestVoice.name}, language: ${bestVoice.lang}`);
         } else {
           // Last resort: use default voice but set language to Spanish Latin America
           speech.lang = 'es-419'; // Spanish Latin America
@@ -51,6 +57,11 @@ export function useSpeechQueue({ voices, setIsSpeaking }: UseSpeechQueueProps) {
         }
         
         console.log(`Speaking (voice: ${speech.voice?.name || 'Default'}, lang: ${speech.lang}): "${text}"`);
+        
+        // Reset speech synthesis if it's in a paused state
+        if (window.speechSynthesis.paused) {
+          window.speechSynthesis.resume();
+        }
         
         // Set up speech events to track speaking state
         speech.onstart = () => {
@@ -60,8 +71,10 @@ export function useSpeechQueue({ voices, setIsSpeaking }: UseSpeechQueueProps) {
         
         speech.onend = () => {
           setIsSpeaking(false);
-          console.log("Speech ended");
+          console.log("Speech ended successfully");
           processingRef.current = false;
+          setIsProcessingState(false);
+          
           // Continue processing the queue after a short delay
           setTimeout(() => {
             if (speakingQueue.current.length > 0) {
@@ -73,7 +86,25 @@ export function useSpeechQueue({ voices, setIsSpeaking }: UseSpeechQueueProps) {
         speech.onerror = (event) => {
           console.error("Speech error:", event);
           setIsSpeaking(false);
+          
+          // Try again if we haven't reached max attempts
+          const textKey = text.substring(0, 20); // Use part of the text as key
+          const attempts = attemptCountRef.current.get(textKey) || 0;
+          
+          if (attempts < maxAttempts) {
+            console.log(`Retrying speech attempt ${attempts + 1}/${maxAttempts}`);
+            attemptCountRef.current.set(textKey, attempts + 1);
+            
+            // Put the text back at the front of the queue
+            speakingQueue.current.unshift(text);
+          } else {
+            console.warn(`Max retry attempts reached for speech: "${textKey}..."`);
+            attemptCountRef.current.delete(textKey);
+          }
+          
           processingRef.current = false;
+          setIsProcessingState(false);
+          
           // Try to continue processing the queue even after an error
           setTimeout(() => {
             if (speakingQueue.current.length > 0) {
@@ -87,6 +118,7 @@ export function useSpeechQueue({ voices, setIsSpeaking }: UseSpeechQueueProps) {
       } catch (error) {
         console.error("Error speaking:", error);
         processingRef.current = false;
+        setIsProcessingState(false);
         // Try to continue processing the queue even after an error
         setTimeout(() => {
           if (speakingQueue.current.length > 0) {
@@ -109,7 +141,7 @@ export function useSpeechQueue({ voices, setIsSpeaking }: UseSpeechQueueProps) {
 
   return {
     queueSpeech,
-    isProcessing: () => processingRef.current,
+    isProcessing: () => isProcessingState,
     queueLength: () => speakingQueue.current.length
   };
 }

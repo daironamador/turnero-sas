@@ -7,7 +7,7 @@ import { formatTicketNumber } from './utils/voiceUtils';
 export function useSpeechSynthesis() {
   const [isSpeakingState, setIsSpeakingState] = useState(false);
   const { voices, isReady, initialize } = useSpeechInit();
-  const { queueSpeech } = useSpeechQueue({ 
+  const { queueSpeech, isProcessing } = useSpeechQueue({ 
     voices, 
     setIsSpeaking: (speaking) => setIsSpeakingState(speaking) 
   });
@@ -28,8 +28,12 @@ export function useSpeechSynthesis() {
     if (!isReady && window.speechSynthesis) {
       console.log("Speech synthesis not yet ready, initializing...");
       initialize();
+      
+      // Reset the speech synthesis to ensure it's not in a stuck state
+      window.speechSynthesis.cancel();
     }
 
+    // Format the ticket number for better pronunciation
     const formattedNumber = formatTicketNumber(ticketNumber);
     
     // Construct the announcement text
@@ -44,11 +48,15 @@ export function useSpeechSynthesis() {
     
     console.log(`Queueing announcement: "${announcementText}"`);
     
-    // Add to queue
+    // Add to queue with retry logic
     queueSpeech(announcementText);
     
     return announcementText;
   }, [queueSpeech, isReady, initialize]);
 
-  return { announceTicket, isSpeaking: isSpeakingState };
+  return { 
+    announceTicket, 
+    isSpeaking: isSpeakingState,
+    isProcessing: isProcessing
+  };
 }

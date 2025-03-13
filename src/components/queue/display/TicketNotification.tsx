@@ -11,7 +11,7 @@ interface TicketNotificationProps {
 }
 
 const TicketNotification: React.FC<TicketNotificationProps> = ({ ticket, rooms }) => {
-  const { announceTicket } = useSpeechSynthesis();
+  const { announceTicket, isSpeaking } = useSpeechSynthesis();
   const announcementMade = useRef(false);
   
   if (!ticket) return null;
@@ -80,7 +80,7 @@ const TicketNotification: React.FC<TicketNotificationProps> = ({ ticket, rooms }
               `por favor dirigirse a ${roomName}` : 
               "por favor dirigirse a recepción"}
         </span>
-        <Volume2 className="w-6 h-6 ml-auto" />
+        <Volume2 className={`w-6 h-6 ml-auto ${isSpeaking ? 'animate-pulse' : ''}`} />
       </div>
     </div>
   );
