@@ -41,16 +41,6 @@ const Display: React.FC = () => {
       
       // Speak the test utterance
       window.speechSynthesis.speak(testUtterance);
-      
-      // Attempt to speak something more substantial after a delay
-      setTimeout(() => {
-        const confirmUtterance = new SpeechSynthesisUtterance("Sistema listo");
-        confirmUtterance.volume = 0.8;
-        confirmUtterance.rate = 0.9;
-        confirmUtterance.lang = 'es-419';
-        window.speechSynthesis.speak(confirmUtterance);
-        console.log("Audio confirmation initiated");
-      }, 2000);
     } catch (error) {
       console.error("Failed to initialize audio:", error);
       toast.error("Error al inicializar el audio. Intente recargar la página.");

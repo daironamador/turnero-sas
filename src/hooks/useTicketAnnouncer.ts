@@ -8,6 +8,7 @@ export const useTicketAnnouncer = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const resendAttemptsRef = useRef<Map<string, number>>(new Map());
   const maxRetries = 3;
+  const lastAnnouncedRef = useRef<{id: string, timestamp: number} | null>(null);
 
   // Initialize broadcast channel for cross-window/tab communication
   useEffect(() => {
@@ -103,6 +104,21 @@ export const useTicketAnnouncer = () => {
       return;
     }
     
+    // Prevent duplicate announcements within a short time frame
+    if (lastAnnouncedRef.current && lastAnnouncedRef.current.id === ticket.id) {
+      const timeSinceLastAnnouncement = Date.now() - lastAnnouncedRef.current.timestamp;
+      if (timeSinceLastAnnouncement < 5000) { // 5 seconds
+        console.log(`Skipping duplicate announcement for ticket ${ticket.id} - just announced ${timeSinceLastAnnouncement}ms ago`);
+        return true;
+      }
+    }
+    
+    // Update last announced reference
+    lastAnnouncedRef.current = {
+      id: ticket.id,
+      timestamp: Date.now()
+    };
+    
     // Find the original room name if this is a redirected ticket
     let originalRoomName: string | undefined;
     if (ticket.redirectedFrom) {
@@ -139,7 +155,7 @@ export const useTicketAnnouncer = () => {
     if (!ticketChannel || isProcessing) {
       console.log("Queueing announcement because", !ticketChannel ? "no channel" : "already processing");
       setAnnouncementQueue(prev => [...prev, announcement]);
-      return;
+      return true;
     }
     
     // Reset retry counter for this ticket if there is an ID
