@@ -5,10 +5,12 @@ import { supabase } from '@/lib/supabase';
 import { getTicketsByStatus } from '@/services/ticketService';
 import { Room, Service, Ticket } from '@/lib/types';
 import { toast } from 'sonner';
+import { useTicketAnnouncer } from './useTicketAnnouncer';
 
 export function useLlamadaData() {
   const [selectedRoom, setSelectedRoom] = useState<(Room & { service: Service }) | null>(null);
   const [currentTicket, setCurrentTicket] = useState<Ticket | undefined>(undefined);
+  const { announceTicket } = useTicketAnnouncer();
   
   // Fetch waiting tickets
   const waitingTicketsQuery = useQuery({
@@ -78,7 +80,7 @@ export function useLlamadaData() {
       if (error) throw error;
       
       if (data && data.length > 0) {
-        setCurrentTicket({
+        const ticket = {
           id: data[0].id,
           ticketNumber: data[0].ticket_number,
           serviceType: data[0].service_type,
@@ -92,7 +94,14 @@ export function useLlamadaData() {
           redirectedTo: data[0].redirected_to,
           redirectedFrom: data[0].redirected_from,
           previousTicketNumber: data[0].previous_ticket_number,
-        });
+        };
+        
+        setCurrentTicket(ticket);
+        
+        // Announce the ticket whenever fetched
+        if (roomsQuery.data && selectedRoom) {
+          announceTicket(ticket, selectedRoom.name, roomsQuery.data);
+        }
       } else {
         setCurrentTicket(undefined);
       }
@@ -140,6 +149,7 @@ export function useLlamadaData() {
     waitingTicketsQuery,
     roomsQuery,
     servicesQuery,
-    handleTicketChange
+    handleTicketChange,
+    announceTicket
   };
 }

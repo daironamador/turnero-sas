@@ -161,7 +161,7 @@ export const useTicketAnnouncer = () => {
       console.error('Failed to send ticket announcement:', error);
       return false;
     }
-  }, []);
+  }, [ticketChannel, isProcessing]);
 
   return { ticketChannel, announceTicket };
 };
