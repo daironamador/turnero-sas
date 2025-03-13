@@ -14,6 +14,7 @@ const TicketNotification: React.FC<TicketNotificationProps> = ({ ticket, rooms }
   const { announceTicket, isSpeaking } = useSpeechSynthesis();
   const announcementMade = useRef(false);
   
+  // If no ticket is provided, render nothing but don't cause the screen to go blank
   if (!ticket) return null;
 
   console.log("TicketNotification displaying ticket:", ticket);
@@ -22,7 +23,9 @@ const TicketNotification: React.FC<TicketNotificationProps> = ({ ticket, rooms }
   let roomName = `sala ${ticket.counterNumber}`;
   if (rooms && ticket.counterNumber) {
     // Find the room that matches either the string or number ID
-    const room = rooms.find(r => r.id === ticket.counterNumber || r.id === String(ticket.counterNumber));
+    const room = rooms.find(r => 
+      r && r.id && (r.id === ticket.counterNumber || r.id === String(ticket.counterNumber))
+    );
     if (room) {
       roomName = room.name;
     }
@@ -33,7 +36,7 @@ const TicketNotification: React.FC<TicketNotificationProps> = ({ ticket, rooms }
   if (ticket.redirectedFrom && rooms) {
     // For redirected tickets, we need to find the original room
     // We'll use the service type to identify which rooms could have been the source
-    const possibleRooms = rooms.filter(r => r.service?.code === ticket.redirectedFrom);
+    const possibleRooms = rooms.filter(r => r && r.service && r.service.code === ticket.redirectedFrom);
     if (possibleRooms.length > 0) {
       // We'll just use the first room with matching service as an approximation
       originalRoomName = possibleRooms[0].name;
@@ -48,15 +51,19 @@ const TicketNotification: React.FC<TicketNotificationProps> = ({ ticket, rooms }
   // Effect to announce the ticket when it first appears
   useEffect(() => {
     if (ticket && !announcementMade.current) {
-      // Announce the ticket using speech synthesis
-      if (ticket.redirectedFrom) {
-        announceTicket(displayNumber, roomName, ticket.redirectedFrom, originalRoomName);
-      } else {
-        announceTicket(displayNumber, roomName);
+      try {
+        // Announce the ticket using speech synthesis
+        if (ticket.redirectedFrom) {
+          announceTicket(displayNumber, roomName, ticket.redirectedFrom, originalRoomName);
+        } else {
+          announceTicket(displayNumber, roomName);
+        }
+        
+        // Mark that we've announced this ticket
+        announcementMade.current = true;
+      } catch (error) {
+        console.error("Error announcing ticket:", error);
       }
-      
-      // Mark that we've announced this ticket
-      announcementMade.current = true;
       
       // Reset the flag when the component unmounts
       return () => {
