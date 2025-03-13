@@ -13,21 +13,28 @@ interface TicketNotificationProps {
 const TicketNotification: React.FC<TicketNotificationProps> = ({ ticket, rooms }) => {
   const { announceTicket, isSpeaking } = useSpeechSynthesis();
   const announcementMade = useRef(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // If no ticket is provided, render nothing but don't cause the screen to go blank
-  if (!ticket) return null;
+  if (!ticket) {
+    return (
+      <div className="hidden">
+        {/* Hidden placeholder to prevent blank screen */}
+      </div>
+    );
+  }
 
   console.log("TicketNotification displaying ticket:", ticket);
 
   // Find room name safely
-  let roomName = `sala ${ticket.counterNumber}`;
+  let roomName = `sala ${ticket.counterNumber || ''}`;
   if (rooms && ticket.counterNumber) {
     // Find the room that matches either the string or number ID
     const room = rooms.find(r => 
       r && r.id && (r.id === ticket.counterNumber || r.id === String(ticket.counterNumber))
     );
     if (room) {
-      roomName = room.name;
+      roomName = room.name || roomName;
     }
   }
 
@@ -39,7 +46,7 @@ const TicketNotification: React.FC<TicketNotificationProps> = ({ ticket, rooms }
     const possibleRooms = rooms.filter(r => r && r.service && r.service.code === ticket.redirectedFrom);
     if (possibleRooms.length > 0) {
       // We'll just use the first room with matching service as an approximation
-      originalRoomName = possibleRooms[0].name;
+      originalRoomName = possibleRooms[0].name || `servicio ${ticket.redirectedFrom}`;
     } else {
       originalRoomName = `servicio ${ticket.redirectedFrom}`;
     }
@@ -52,6 +59,11 @@ const TicketNotification: React.FC<TicketNotificationProps> = ({ ticket, rooms }
   useEffect(() => {
     if (ticket && !announcementMade.current) {
       try {
+        // Cancel any previous announcement timeouts
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+        }
+        
         // Announce the ticket using speech synthesis
         if (ticket.redirectedFrom) {
           announceTicket(displayNumber, roomName, ticket.redirectedFrom, originalRoomName);
@@ -61,20 +73,30 @@ const TicketNotification: React.FC<TicketNotificationProps> = ({ ticket, rooms }
         
         // Mark that we've announced this ticket
         announcementMade.current = true;
+        
+        // Set a timeout to reset the announcement flag after a reasonable time
+        timeoutRef.current = setTimeout(() => {
+          announcementMade.current = false;
+        }, 10000);
       } catch (error) {
         console.error("Error announcing ticket:", error);
+        // Reset flag on error to allow future retry
+        announcementMade.current = false;
       }
       
       // Reset the flag when the component unmounts
       return () => {
         announcementMade.current = false;
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+        }
       };
     }
   }, [ticket, roomName, displayNumber, originalRoomName, announceTicket]);
 
   return (
     <div className={`text-white p-4 animate-pulse ${ticket.isVip ? 'bg-yellow-500' : 'bg-ocular-500'}`}>
-      <div className="container mx-auto flex items-center">
+      <div className="container mx-auto flex items-center flex-wrap">
         <Bell className="w-6 h-6 mr-3 animate-bounce" />
         <span className="text-xl font-bold mr-2 flex items-center">
           Turno {displayNumber}

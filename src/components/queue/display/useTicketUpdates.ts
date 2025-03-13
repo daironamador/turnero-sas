@@ -29,6 +29,14 @@ export function useTicketUpdates({
   const [processingAnnouncement, setProcessingAnnouncement] = useState(false);
   const announcementTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const processedAnnouncements = useRef<Set<string>>(new Set());
+  const deviceId = useRef<string>(localStorage.getItem('deviceId') || `device-${Math.random().toString(36).substring(2, 9)}`);
+  
+  // Save device ID to localStorage for persistence
+  useEffect(() => {
+    if (!localStorage.getItem('deviceId')) {
+      localStorage.setItem('deviceId', deviceId.current);
+    }
+  }, []);
   
   const processTicketAnnouncement = (
     ticket: Ticket, 
@@ -71,6 +79,7 @@ export function useTicketUpdates({
         setLastAnnounced(ticket.id);
         
         try {
+          // Announce with device ID context to help with multi-device coordination
           announceTicket(
             ticket.ticketNumber || "",
             counterName,
@@ -85,6 +94,7 @@ export function useTicketUpdates({
               ackChannel.postMessage({
                 type: 'announcement-received',
                 ticketId: ticket.id,
+                deviceId: deviceId.current,
                 timestamp: Date.now()
               });
               
@@ -156,6 +166,7 @@ export function useTicketUpdates({
             const { ticket, counterName, redirectedFrom, originalRoomName } = event.data;
             
             if (ticket && counterName) {
+              // Process announcement even if from a different device
               processTicketAnnouncement(ticket, counterName, redirectedFrom, originalRoomName);
             } else {
               console.error("Received invalid announcement data:", event.data);
