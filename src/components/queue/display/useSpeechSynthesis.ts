@@ -6,6 +6,12 @@ import { formatTicketNumber } from './utils/voiceUtils';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 
+// Create an interface for the announcement record
+interface AnnouncementRecord {
+  text: string;
+  timestamp: number;
+}
+
 export function useSpeechSynthesis() {
   const [isSpeakingState, setIsSpeakingState] = useState(false);
   const { voices, isReady, initialize } = useSpeechInit();
@@ -13,7 +19,7 @@ export function useSpeechSynthesis() {
     voices, 
     setIsSpeaking: (speaking) => setIsSpeakingState(speaking) 
   });
-  const lastAnnouncementRef = useRef<string | null>(null);
+  const lastAnnouncementRef = useRef<AnnouncementRecord | null>(null);
   const useNativeRef = useRef<boolean>(true);
   
   // Initialize speech synthesis when component mounts
@@ -147,16 +153,19 @@ export function useSpeechSynthesis() {
     }
     
     // Avoid repeating the exact same announcement too quickly
-    if (lastAnnouncementRef.current === announcementText) {
-      const timeSinceLastAnnouncement = Date.now() - (lastAnnouncementRef.current?.timestamp || 0);
+    if (lastAnnouncementRef.current && lastAnnouncementRef.current.text === announcementText) {
+      const timeSinceLastAnnouncement = Date.now() - lastAnnouncementRef.current.timestamp;
       if (timeSinceLastAnnouncement < 5000) { // 5 seconds
         console.log("Skipping duplicate announcement that was just made");
         return announcementText;
       }
     }
     
-    lastAnnouncementRef.current = announcementText;
-    lastAnnouncementRef.current.timestamp = Date.now();
+    // Update the last announcement with text and timestamp
+    lastAnnouncementRef.current = {
+      text: announcementText,
+      timestamp: Date.now()
+    };
     
     console.log(`Announcing: "${announcementText}" using ${useNativeRef.current ? 'native' : 'OpenAI'} synthesis`);
     
