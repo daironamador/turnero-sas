@@ -29,14 +29,6 @@ export function useTicketUpdates({
   const [processingAnnouncement, setProcessingAnnouncement] = useState(false);
   const announcementTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const processedAnnouncements = useRef<Set<string>>(new Set());
-  const deviceId = useRef<string>(localStorage.getItem('deviceId') || `device-${Math.random().toString(36).substring(2, 9)}`);
-  
-  // Save device ID to localStorage for persistence
-  useEffect(() => {
-    if (!localStorage.getItem('deviceId')) {
-      localStorage.setItem('deviceId', deviceId.current);
-    }
-  }, []);
   
   const processTicketAnnouncement = (
     ticket: Ticket, 
@@ -44,11 +36,6 @@ export function useTicketUpdates({
     redirectedFrom?: string, 
     originalRoomName?: string
   ) => {
-    if (!ticket || !ticket.id) {
-      console.error('Invalid ticket received for announcement');
-      return;
-    }
-
     // Create a unique key for this announcement to prevent duplicates
     const announcementKey = `${ticket.id}-${Date.now()}`;
     
@@ -68,67 +55,60 @@ export function useTicketUpdates({
 
     console.log(`Processing announcement for ticket ${ticket.ticketNumber} on display`);
     
-    try {
-      // Show the ticket on the display - do this first before any potential errors
-      setNewlyCalledTicket(ticket);
+    // Show the ticket on the display
+    setNewlyCalledTicket(ticket);
+    
+    if (counterName) {
+      console.log(`Announcing ticket ${ticket.ticketNumber} to ${counterName}`);
       
-      if (counterName) {
-        console.log(`Announcing ticket ${ticket.ticketNumber} to ${counterName}`);
+      setProcessingAnnouncement(true);
+      setLastAnnounced(ticket.id);
+      
+      try {
+        announceTicket(
+          ticket.ticketNumber,
+          counterName,
+          redirectedFrom,
+          originalRoomName
+        );
         
-        setProcessingAnnouncement(true);
-        setLastAnnounced(ticket.id);
-        
-        try {
-          // Announce with device ID context to help with multi-device coordination
-          announceTicket(
-            ticket.ticketNumber || "",
-            counterName,
-            redirectedFrom,
-            originalRoomName
-          );
-          
-          // Send acknowledgment back through BroadcastChannel
-          if (typeof BroadcastChannel !== 'undefined') {
-            try {
-              const ackChannel = new BroadcastChannel('ticket-announcements');
-              ackChannel.postMessage({
-                type: 'announcement-received',
-                ticketId: ticket.id,
-                deviceId: deviceId.current,
-                timestamp: Date.now()
-              });
-              
-              // Close channel after sending
-              setTimeout(() => {
-                ackChannel.close();
-              }, 1000);
-            } catch (error) {
-              console.error('Error sending announcement acknowledgment:', error);
-            }
+        // Send acknowledgment back through BroadcastChannel
+        if (typeof BroadcastChannel !== 'undefined') {
+          try {
+            const ackChannel = new BroadcastChannel('ticket-announcements');
+            ackChannel.postMessage({
+              type: 'announcement-received',
+              ticketId: ticket.id,
+              timestamp: Date.now()
+            });
+            
+            // Close channel after sending
+            setTimeout(() => {
+              ackChannel.close();
+            }, 1000);
+          } catch (error) {
+            console.error('Error sending announcement acknowledgment:', error);
           }
-          
-          // Clear any existing timeout for this ticket
-          if (announcementTimeouts.current.has(ticket.id)) {
-            clearTimeout(announcementTimeouts.current.get(ticket.id));
-          }
-          
-          // Set a new timeout to allow this ticket to be announced again after 3 seconds
-          const timeoutId = setTimeout(() => {
-            setProcessingAnnouncement(false);
-            console.log(`Ready to process new announcements after ${ticket.ticketNumber}`);
-          }, 3000);
-          
-          announcementTimeouts.current.set(ticket.id, timeoutId);
-        } catch (error) {
-          console.error('Error announcing ticket:', error);
-          setProcessingAnnouncement(false);
         }
-      } else {
-        console.error('Missing room name for announcement');
+        
+        // Clear any existing timeout for this ticket
+        if (announcementTimeouts.current.has(ticket.id)) {
+          clearTimeout(announcementTimeouts.current.get(ticket.id));
+        }
+        
+        // Set a new timeout to allow this ticket to be announced again after 3 seconds
+        const timeoutId = setTimeout(() => {
+          setProcessingAnnouncement(false);
+          console.log(`Ready to process new announcements after ${ticket.ticketNumber}`);
+        }, 3000);
+        
+        announcementTimeouts.current.set(ticket.id, timeoutId);
+      } catch (error) {
+        console.error('Error announcing ticket:', error);
         setProcessingAnnouncement(false);
       }
-    } catch (error) {
-      console.error('Error in ticket announcement process:', error);
+    } else {
+      console.error('Missing room name for announcement');
       setProcessingAnnouncement(false);
     }
   };
@@ -166,7 +146,6 @@ export function useTicketUpdates({
             const { ticket, counterName, redirectedFrom, originalRoomName } = event.data;
             
             if (ticket && counterName) {
-              // Process announcement even if from a different device
               processTicketAnnouncement(ticket, counterName, redirectedFrom, originalRoomName);
             } else {
               console.error("Received invalid announcement data:", event.data);
