@@ -1,7 +1,9 @@
+
 import React, { useEffect, useRef } from 'react';
 import DisplayScreen from '@/components/queue/DisplayScreen';
 import { Helmet } from 'react-helmet';
 import { toast } from 'sonner';
+import { supabase } from '@/lib/supabase';
 
 const Display: React.FC = () => {
   const audioInitialized = useRef(false);
@@ -46,6 +48,26 @@ const Display: React.FC = () => {
       toast.error("Error al inicializar el audio. Intente recargar la página.");
     }
   };
+
+  // Enable anonymous access to display data
+  const enableAnonymousAccess = async () => {
+    try {
+      // Test connection to Supabase without auth
+      const { data, error } = await supabase
+        .from('tickets')
+        .select('count(*)')
+        .limit(1);
+        
+      if (error) {
+        console.error("Error accessing Supabase:", error);
+        toast.error("Error de conexión a la base de datos.");
+      } else {
+        console.log("Supabase connection successful for display page");
+      }
+    } catch (err) {
+      console.error("Supabase connection error:", err);
+    }
+  };
   
   // Initialize page and audio
   useEffect(() => {
@@ -54,6 +76,9 @@ const Display: React.FC = () => {
     window.name = "ticket-display-screen";
     
     console.log("Display page initialized and ready to receive announcements");
+    
+    // Enable anonymous access
+    enableAnonymousAccess();
     
     // Check if we're running on a server vs. client
     const isClient = typeof window !== 'undefined';
