@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { Bell, Volume2, Star, AlertTriangle } from 'lucide-react';
 import { Ticket } from '@/lib/types';
@@ -12,17 +11,66 @@ interface TicketNotificationProps {
 }
 
 const TicketNotification: React.FC<TicketNotificationProps> = ({ ticket, rooms }) => {
-  const { announceTicket, isSpeaking } = useSpeechSynthesis();
+  const { announceTicket, isSpeaking, isInitialized } = useSpeechSynthesis();
   const announcementMade = useRef(false);
   const [announcementError, setAnnouncementError] = useState<string | null>(null);
   
   useEffect(() => {
-    // Reset error state when ticket changes
     if (ticket) {
       setAnnouncementError(null);
+      
+      // Only try to announce if audio is initialized
+      if (isInitialized && !announcementMade.current) {
+        console.log(`Attempting to announce ticket ${ticket.ticketNumber}`);
+        
+        const timeoutId = setTimeout(async () => {
+          try {
+            let roomName = `sala ${ticket.counterNumber}`;
+            if (rooms && ticket.counterNumber) {
+              const room = rooms.find(r => r.id === ticket.counterNumber || r.id === String(ticket.counterNumber));
+              if (room) {
+                roomName = room.name;
+              }
+            }
+
+            let originalRoomName;
+            if (ticket.redirectedFrom && rooms) {
+              const possibleRooms = rooms.filter(r => r.service?.code === ticket.redirectedFrom);
+              if (possibleRooms.length > 0) {
+                originalRoomName = possibleRooms[0].name;
+              } else {
+                originalRoomName = `servicio ${ticket.redirectedFrom}`;
+              }
+            }
+
+            // Announce the ticket
+            const announcementText = await announceTicket(
+              ticket.ticketNumber,
+              roomName,
+              ticket.redirectedFrom,
+              originalRoomName
+            );
+            
+            if (!announcementText) {
+              console.error("No announcement text generated");
+              setAnnouncementError("Error al anunciar turno por voz");
+            }
+            
+            announcementMade.current = true;
+          } catch (error) {
+            console.error("Error announcing ticket:", error);
+            setAnnouncementError("Error al anunciar turno por voz");
+          }
+        }, 300);
+        
+        return () => {
+          clearTimeout(timeoutId);
+          announcementMade.current = false;
+        };
+      }
     }
-  }, [ticket]);
-  
+  }, [ticket, rooms, announceTicket, isInitialized]);
+
   if (!ticket) return null;
 
   console.log("TicketNotification displaying ticket:", ticket);
