@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -26,7 +25,6 @@ import Notification from "./pages/Notification";
 const queryClient = new QueryClient();
 
 const App = () => {
-  // Setup realtime subscriptions
   useEffect(() => {
     const cleanup = setupRealtimeSubscriptions();
     return () => cleanup();
@@ -43,54 +41,53 @@ const App = () => {
               <Route path="/login" element={<Login />} />
               <Route path="/display" element={<Display />} />
               
-              {/* Protected routes */}
               <Route path="/" element={
                 <ProtectedRoute>
                   <Index />
                 </ProtectedRoute>
               } />
               <Route path="/tickets" element={
-                <ProtectedRoute allowedRoles={['admin', 'operator']}>
+                <ProtectedRoute>
                   <Tickets />
                 </ProtectedRoute>
               } />
               <Route path="/llamada" element={
-                <ProtectedRoute allowedRoles={['admin', 'operator']}>
+                <ProtectedRoute>
                   <Llamada />
                 </ProtectedRoute>
               } />
               <Route path="/reports" element={
-                <ProtectedRoute allowedRoles={['admin', 'operator', 'viewer']}>
+                <ProtectedRoute>
                   <Reports />
                 </ProtectedRoute>
               } />
               <Route path="/config" element={
-                <ProtectedRoute allowedRoles={['admin']}>
+                <ProtectedRoute>
                   <Config />
                 </ProtectedRoute>
               } />
               <Route path="/config/services" element={
-                <ProtectedRoute allowedRoles={['admin']}>
+                <ProtectedRoute>
                   <ConfigServices />
                 </ProtectedRoute>
               } />
               <Route path="/config/rooms" element={
-                <ProtectedRoute allowedRoles={['admin']}>
+                <ProtectedRoute>
                   <ConfigRooms />
                 </ProtectedRoute>
               } />
               <Route path="/config/settings" element={
-                <ProtectedRoute allowedRoles={['admin']}>
+                <ProtectedRoute>
                   <ConfigSettings />
                 </ProtectedRoute>
               } />
               <Route path="/config/users" element={
-                <ProtectedRoute allowedRoles={['admin']}>
+                <ProtectedRoute>
                   <ConfigUsers />
                 </ProtectedRoute>
               } />
               <Route path="/notification" element={
-                <ProtectedRoute allowedRoles={['admin']}>
+                <ProtectedRoute>
                   <Notification />
                 </ProtectedRoute>
               } />
