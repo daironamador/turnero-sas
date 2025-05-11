@@ -1,9 +1,10 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Service, Ticket, Room, ServiceType } from '@/lib/types';
 import { useTicketMutations } from '@/hooks/useTicketMutations';
 import { useTicketAnnouncer } from '@/hooks/useTicketAnnouncer';
 import TicketActions from './TicketActions';
+import { toast } from 'sonner';
 
 interface TicketManagerProps {
   currentTicket?: Ticket;
@@ -26,6 +27,7 @@ const TicketManager: React.FC<TicketManagerProps> = ({
 }) => {
   const [isRedirectDialogOpen, setIsRedirectDialogOpen] = useState(false);
   const [selectedService, setSelectedService] = useState<string | undefined>(undefined);
+  const [audioPermissionGranted, setAudioPermissionGranted] = useState(false);
 
   const nextTicket = waitingTickets.length > 0 ? waitingTickets[0] : undefined;
   
@@ -38,16 +40,48 @@ const TicketManager: React.FC<TicketManagerProps> = ({
     recallTicketMutation
   } = useTicketMutations(counterNumber, onTicketChange);
 
+  // Intentar conseguir permisos de audio al inicio
+  useEffect(() => {
+    if (navigator.mediaDevices) {
+      navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(() => {
+          console.log("Permisos de audio concedidos");
+          setAudioPermissionGranted(true);
+        })
+        .catch(error => {
+          console.warn("No se pudo obtener permisos de audio:", error);
+          // No mostrar error aquí ya que sólo es para reproducción y puede funcionar igualmente
+        });
+    }
+  }, []);
+
   const handleCallNext = () => {
     if (!nextTicket) return;
+    
+    // Intentar reproducir un sonido corto para activar audio en móviles
+    try {
+      const audioContext = new AudioContext();
+      const oscillator = audioContext.createOscillator();
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(0, audioContext.currentTime); // Frecuencia 0 para que no se escuche
+      oscillator.connect(audioContext.destination);
+      oscillator.start();
+      oscillator.stop(audioContext.currentTime + 0.01);
+    } catch (e) {
+      console.log("No se pudo crear el contexto de audio:", e);
+    }
+    
     callTicketMutation.mutate({ 
       ticketId: nextTicket.id, 
       counterNumber 
     }, {
       onSuccess: () => {
-        // Announce the ticket after successful call
+        // Anunciar el ticket después de llamarlo exitosamente
         if (counterName) {
-          announceTicket(nextTicket, counterName, rooms);
+          const announced = announceTicket(nextTicket, counterName, rooms);
+          if (!announced) {
+            toast.warning("Es posible que el anuncio de voz no funcione. Intente llamar otra vez después.");
+          }
         }
       }
     });
@@ -81,26 +115,43 @@ const TicketManager: React.FC<TicketManagerProps> = ({
 
   const handleCallAgain = () => {
     if (!currentTicket || !counterName) return;
-    announceTicket(currentTicket, counterName, rooms);
+    
+    // Intentar reproducir un sonido corto para activar audio en móviles
+    try {
+      const audioContext = new AudioContext();
+      const oscillator = audioContext.createOscillator();
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(0, audioContext.currentTime); // Frecuencia 0 para que no se escuche
+      oscillator.connect(audioContext.destination);
+      oscillator.start();
+      oscillator.stop(audioContext.currentTime + 0.01);
+    } catch (e) {
+      console.log("No se pudo crear el contexto de audio:", e);
+    }
+    
+    const announced = announceTicket(currentTicket, counterName, rooms);
+    if (!announced) {
+      toast.warning("Es posible que el anuncio de voz no funcione en este dispositivo.");
+    }
   };
 
   const handleRecallFromHistory = (ticket: Ticket) => {
     if (!counterName) return;
     
-    // Create a properly formatted ticket object before recall
+    // Crear un objeto de ticket correctamente formateado antes de llamar
     const recallTicket = {
       ...ticket,
-      counterNumber: counterNumber // Keep as string for the mutation
+      counterNumber: counterNumber // Mantener como string para la mutación
     };
     
     recallTicketMutation.mutate({ 
       ticket: recallTicket
     }, {
       onSuccess: () => {
-        // For announcement, ensure we use the right format for announcement
+        // Para anuncio, asegurarse de usar el formato correcto para el anuncio
         announceTicket({
           ...ticket,
-          counterNumber: counterNumber, // Keep as string for announcement
+          counterNumber: counterNumber, // Mantener como string para el anuncio
           status: "serving"
         }, counterName, rooms);
       }

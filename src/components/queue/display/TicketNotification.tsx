@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { Bell, Volume2, Star, AlertTriangle } from 'lucide-react';
 import { Ticket } from '@/lib/types';
@@ -11,39 +12,48 @@ interface TicketNotificationProps {
 }
 
 const TicketNotification: React.FC<TicketNotificationProps> = ({ ticket, rooms }) => {
-  const { announceTicket, isSpeaking, isInitialized } = useSpeechSynthesis();
+  const { announceTicket, isSpeaking, isInitialized, initializeAudio } = useSpeechSynthesis();
   const announcementMade = useRef(false);
   const [announcementError, setAnnouncementError] = useState<string | null>(null);
   
+  // Intenta inicializar el audio cuando el componente se monta
   useEffect(() => {
-    if (ticket) {
+    initializeAudio();
+  }, [initializeAudio]);
+  
+  useEffect(() => {
+    if (ticket && !announcementMade.current) {
       setAnnouncementError(null);
+      console.log(`Intentando anunciar ticket ${ticket.ticketNumber}`);
       
-      // Only try to announce if audio is initialized
-      if (isInitialized && !announcementMade.current) {
-        console.log(`Attempting to announce ticket ${ticket.ticketNumber}`);
-        
-        const timeoutId = setTimeout(async () => {
+      // Pequeño retraso para asegurar que la síntesis de voz esté lista
+      const timeoutId = setTimeout(async () => {
+        try {
+          // Encuentra el nombre de la sala
+          let roomName = `sala ${ticket.counterNumber}`;
+          if (rooms && ticket.counterNumber) {
+            const room = rooms.find(r => r.id === ticket.counterNumber || r.id === String(ticket.counterNumber));
+            if (room) {
+              roomName = room.name;
+            }
+          }
+
+          // Encuentra la sala original para tickets redirigidos
+          let originalRoomName;
+          if (ticket.redirectedFrom && rooms) {
+            const possibleRooms = rooms.filter(r => r.service?.code === ticket.redirectedFrom);
+            if (possibleRooms.length > 0) {
+              originalRoomName = possibleRooms[0].name;
+            } else {
+              originalRoomName = `servicio ${ticket.redirectedFrom}`;
+            }
+          }
+
+          // Anuncia el ticket - forzando la inicialización del audio si no está listo
           try {
-            let roomName = `sala ${ticket.counterNumber}`;
-            if (rooms && ticket.counterNumber) {
-              const room = rooms.find(r => r.id === ticket.counterNumber || r.id === String(ticket.counterNumber));
-              if (room) {
-                roomName = room.name;
-              }
-            }
-
-            let originalRoomName;
-            if (ticket.redirectedFrom && rooms) {
-              const possibleRooms = rooms.filter(r => r.service?.code === ticket.redirectedFrom);
-              if (possibleRooms.length > 0) {
-                originalRoomName = possibleRooms[0].name;
-              } else {
-                originalRoomName = `servicio ${ticket.redirectedFrom}`;
-              }
-            }
-
-            // Announce the ticket
+            // Intenta inicializar el audio antes del anuncio
+            await initializeAudio();
+            
             const announcementText = await announceTicket(
               ticket.ticketNumber,
               roomName,
@@ -52,92 +62,29 @@ const TicketNotification: React.FC<TicketNotificationProps> = ({ ticket, rooms }
             );
             
             if (!announcementText) {
-              console.error("No announcement text generated");
+              console.error("No se generó texto para el anuncio");
               setAnnouncementError("Error al anunciar turno por voz");
             }
-            
-            announcementMade.current = true;
           } catch (error) {
-            console.error("Error announcing ticket:", error);
-            setAnnouncementError("Error al anunciar turno por voz");
-          }
-        }, 300);
-        
-        return () => {
-          clearTimeout(timeoutId);
-          announcementMade.current = false;
-        };
-      }
-    }
-  }, [ticket, rooms, announceTicket, isInitialized]);
-
-  if (!ticket) return null;
-
-  console.log("TicketNotification displaying ticket:", ticket);
-
-  // Find room name safely
-  let roomName = `sala ${ticket.counterNumber}`;
-  if (rooms && ticket.counterNumber) {
-    // Find the room that matches either the string or number ID
-    const room = rooms.find(r => r.id === ticket.counterNumber || r.id === String(ticket.counterNumber));
-    if (room) {
-      roomName = room.name;
-    }
-  }
-
-  // Find original room name for redirected tickets
-  let originalRoomName = '';
-  if (ticket.redirectedFrom && rooms) {
-    // For redirected tickets, we need to find the original room
-    // We'll use the service type to identify which rooms could have been the source
-    const possibleRooms = rooms.filter(r => r.service?.code === ticket.redirectedFrom);
-    if (possibleRooms.length > 0) {
-      // We'll just use the first room with matching service as an approximation
-      originalRoomName = possibleRooms[0].name;
-    } else {
-      originalRoomName = `servicio ${ticket.redirectedFrom}`;
-    }
-  }
-
-  // Use the ticket's original number for display
-  const displayNumber = ticket.ticketNumber || '';
-
-  // Effect to announce the ticket when it first appears
-  useEffect(() => {
-    if (ticket && !announcementMade.current) {
-      console.log(`Attempting to announce ticket ${displayNumber} to ${roomName}`);
-      
-      // Slight delay to ensure speech synthesis is ready
-      const timeoutId = setTimeout(async () => {
-        try {
-          // Announce the ticket using speech synthesis
-          let announcementText;
-          if (ticket.redirectedFrom) {
-            announcementText = await announceTicket(displayNumber, roomName, ticket.redirectedFrom, originalRoomName);
-          } else {
-            announcementText = await announceTicket(displayNumber, roomName);
-          }
-          
-          if (!announcementText) {
-            console.error("Announcement failed to generate text");
+            console.error("Error al anunciar el ticket:", error);
             setAnnouncementError("Error al anunciar turno por voz");
           }
           
-          // Mark that we've announced this ticket
           announcementMade.current = true;
         } catch (error) {
-          console.error("Error announcing ticket:", error);
+          console.error("Error en el proceso de anuncio:", error);
           setAnnouncementError("Error al anunciar turno por voz");
         }
-      }, 300);
+      }, 500); // Aumentamos el tiempo de espera para dar más tiempo a la inicialización
       
-      // Reset the flag when the component unmounts
       return () => {
         clearTimeout(timeoutId);
         announcementMade.current = false;
       };
     }
-  }, [ticket, roomName, displayNumber, originalRoomName, announceTicket]);
+  }, [ticket, rooms, announceTicket, isInitialized, initializeAudio]);
+
+  if (!ticket) return null;
 
   return (
     <>
@@ -145,17 +92,51 @@ const TicketNotification: React.FC<TicketNotificationProps> = ({ ticket, rooms }
         <div className="container mx-auto flex items-center">
           <Bell className="w-6 h-6 mr-3 animate-bounce" />
           <span className="text-xl font-bold mr-2 flex items-center">
-            Turno {displayNumber}
+            Turno {ticket.ticketNumber}
             {ticket.isVip && <Star className="ml-2 h-5 w-5" />}
           </span>
           <span className="text-xl">
             {ticket.redirectedFrom ? 
-              `referido de ${originalRoomName}, por favor dirigirse a ${roomName}` : 
+              `referido de ${rooms?.find(r => r.service?.code === ticket.redirectedFrom)?.name || `servicio ${ticket.redirectedFrom}`}, por favor dirigirse a ${rooms?.find(r => r.id === ticket.counterNumber)?.name || `sala ${ticket.counterNumber}`}` : 
               ticket.counterNumber ? 
-                `por favor dirigirse a ${roomName}` : 
+                `por favor dirigirse a ${rooms?.find(r => r.id === ticket.counterNumber)?.name || `sala ${ticket.counterNumber}`}` : 
                 "por favor dirigirse a recepción"}
           </span>
-          <Volume2 className={`w-6 h-6 ml-auto ${isSpeaking ? 'animate-pulse' : ''}`} />
+          <Volume2 
+            className={`w-6 h-6 ml-auto ${isSpeaking ? 'animate-pulse' : ''}`} 
+            onClick={() => {
+              if (ticket) {
+                // Al hacer clic en el icono, intentar reproducir el anuncio nuevamente
+                let roomName = `sala ${ticket.counterNumber}`;
+                if (rooms && ticket.counterNumber) {
+                  const room = rooms.find(r => r.id === ticket.counterNumber || r.id === String(ticket.counterNumber));
+                  if (room) {
+                    roomName = room.name;
+                  }
+                }
+
+                let originalRoomName;
+                if (ticket.redirectedFrom && rooms) {
+                  const possibleRooms = rooms.filter(r => r.service?.code === ticket.redirectedFrom);
+                  if (possibleRooms.length > 0) {
+                    originalRoomName = possibleRooms[0].name;
+                  } else {
+                    originalRoomName = `servicio ${ticket.redirectedFrom}`;
+                  }
+                }
+
+                announceTicket(
+                  ticket.ticketNumber,
+                  roomName,
+                  ticket.redirectedFrom,
+                  originalRoomName
+                ).catch(error => {
+                  console.error("Error al reproducir anuncio al hacer clic:", error);
+                  setAnnouncementError("Error al reproducir anuncio de voz");
+                });
+              }
+            }}
+          />
         </div>
       </div>
       
@@ -163,7 +144,7 @@ const TicketNotification: React.FC<TicketNotificationProps> = ({ ticket, rooms }
         <Alert variant="destructive" className="mt-2">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            {announcementError} - Abre la página de Display en otra pestaña para recibir anuncios de voz.
+            {announcementError} - Prueba hacer clic en el icono de altavoz para reproducir el anuncio manualmente.
           </AlertDescription>
         </Alert>
       )}

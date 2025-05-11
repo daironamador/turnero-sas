@@ -1,6 +1,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Room, Ticket } from '@/lib/types';
+import { toast } from 'sonner';
 
 export const useTicketAnnouncer = () => {
   const [ticketChannel, setTicketChannel] = useState<BroadcastChannel | null>(null);
@@ -10,52 +11,66 @@ export const useTicketAnnouncer = () => {
   const maxRetries = 3;
   const lastAnnouncedRef = useRef<{id: string, timestamp: number} | null>(null);
 
-  // Initialize broadcast channel for cross-window/tab communication
+  // Inicializar canal de broadcast para comunicación entre ventanas/pestañas
   useEffect(() => {
-    // Only create channel if BroadcastChannel is supported
+    // Sólo crear canal si BroadcastChannel es soportado
     if (typeof BroadcastChannel !== 'undefined') {
       try {
         const channel = new BroadcastChannel('ticket-announcements');
         setTicketChannel(channel);
         
-        console.log("BroadcastChannel for ticket announcements initialized");
+        console.log("BroadcastChannel para anuncios de tickets inicializado");
         
-        // Setup message listener for acknowledgments
+        // Configurar listener de mensajes para confirmaciones
         channel.onmessage = (event) => {
           if (event.data?.type === 'announcement-received' && event.data?.ticketId) {
-            console.log(`Received acknowledgment for ticket ${event.data.ticketId}`);
-            // Clear any pending resend attempts for this ticket
+            console.log(`Recibida confirmación para ticket ${event.data.ticketId}`);
+            // Limpiar cualquier intento pendiente de reenvío para este ticket
             if (resendAttemptsRef.current.has(event.data.ticketId)) {
               resendAttemptsRef.current.delete(event.data.ticketId);
             }
           }
         };
         
+        // Reproducir un sonido silencioso para activar las capacidades de audio
+        try {
+          const audioContext = new AudioContext();
+          const oscillator = audioContext.createOscillator();
+          oscillator.type = "sine";
+          oscillator.frequency.setValueAtTime(0, audioContext.currentTime); // Frecuencia 0 para que sea silencioso
+          oscillator.connect(audioContext.destination);
+          oscillator.start();
+          oscillator.stop(audioContext.currentTime + 0.01);
+          audioContext.close();
+        } catch (e) {
+          console.log("No se pudo inicializar el contexto de audio:", e);
+        }
+        
         return () => {
           channel.close();
         };
       } catch (error) {
-        console.error("Failed to create BroadcastChannel:", error);
+        console.error("Error al crear BroadcastChannel:", error);
       }
     } else {
-      console.warn("BroadcastChannel not supported in this browser");
+      console.warn("BroadcastChannel no es soportado en este navegador");
     }
   }, []);
 
-  // Process the announcement queue
+  // Procesar la cola de anuncios
   useEffect(() => {
     if (announcementQueue.length > 0 && !isProcessing && ticketChannel) {
       setIsProcessing(true);
       
-      // Get the next announcement
+      // Obtener el siguiente anuncio
       const nextAnnouncement = announcementQueue[0];
       
-      // Remove it from the queue
+      // Eliminarlo de la cola
       setAnnouncementQueue(prev => prev.slice(1));
       
-      // Send the announcement
+      // Enviar el anuncio
       try {
-        // Add a unique timestamp to prevent duplicate filtering
+        // Añadir un timestamp único para prevenir filtrado de duplicados
         const announcementWithTimestamp = {
           ...nextAnnouncement,
           messageId: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
@@ -63,35 +78,35 @@ export const useTicketAnnouncer = () => {
         };
         
         ticketChannel.postMessage(announcementWithTimestamp);
-        console.log("Sent announcement from queue:", nextAnnouncement.ticket?.ticketNumber, "with ID:", announcementWithTimestamp.messageId);
+        console.log("Anuncio enviado desde cola:", nextAnnouncement.ticket?.ticketNumber, "con ID:", announcementWithTimestamp.messageId);
         
-        // Add a resend attempt after a delay if we don't receive acknowledgement
+        // Añadir un intento de reenvío después de un retraso si no recibimos confirmación
         const ticketId = nextAnnouncement.ticket?.id;
         if (ticketId) {
           const currentAttempts = resendAttemptsRef.current.get(ticketId) || 0;
           
           if (currentAttempts < maxRetries) {
-            // Increment the retry counter for this ticket
+            // Incrementar el contador de reintentos para este ticket
             resendAttemptsRef.current.set(ticketId, currentAttempts + 1);
             
-            // Wait for acknowledgment or resend
+            // Esperar por confirmación o reenviar
             setTimeout(() => {
-              // Only resend if we haven't received an acknowledgment
+              // Solo reenviar si no hemos recibido una confirmación
               if (resendAttemptsRef.current.has(ticketId)) {
-                console.log(`No acknowledgment received for ticket ${ticketId}, attempt ${currentAttempts + 1}/${maxRetries}`);
+                console.log(`No se recibió confirmación para ticket ${ticketId}, intento ${currentAttempts + 1}/${maxRetries}`);
                 setAnnouncementQueue(prev => [nextAnnouncement, ...prev]);
               }
-            }, 3000); // Resend after 3 seconds if no acknowledgment
+            }, 3000); // Reenviar después de 3 segundos si no hay confirmación
           } else {
-            console.warn(`Max resend attempts (${maxRetries}) reached for ticket ${ticketId}`);
+            console.warn(`Máximos intentos de reenvío (${maxRetries}) alcanzados para ticket ${ticketId}`);
             resendAttemptsRef.current.delete(ticketId);
           }
         }
       } catch (error) {
-        console.error("Failed to send queued announcement:", error);
+        console.error("Error al enviar anuncio en cola:", error);
       }
       
-      // Allow the next announcement after a delay
+      // Permitir el siguiente anuncio después de un retraso
       setTimeout(() => {
         setIsProcessing(false);
       }, 1000);
@@ -99,30 +114,32 @@ export const useTicketAnnouncer = () => {
   }, [announcementQueue, isProcessing, ticketChannel]);
 
   const announceTicket = useCallback((ticket: Ticket, counterName: string, rooms: Room[]) => {
+    console.log("Anunciando ticket:", ticket.ticketNumber, "a sala:", counterName);
+    
     if (!counterName) {
-      console.error("Cannot announce ticket: counterName is undefined");
-      return;
+      console.error("No se puede anunciar ticket: counterName es undefined");
+      return false;
     }
     
-    // Prevent duplicate announcements within a short time frame
+    // Prevenir anuncios duplicados en un corto período de tiempo
     if (lastAnnouncedRef.current && lastAnnouncedRef.current.id === ticket.id) {
       const timeSinceLastAnnouncement = Date.now() - lastAnnouncedRef.current.timestamp;
-      if (timeSinceLastAnnouncement < 5000) { // 5 seconds
-        console.log(`Skipping duplicate announcement for ticket ${ticket.id} - just announced ${timeSinceLastAnnouncement}ms ago`);
+      if (timeSinceLastAnnouncement < 3000) { // 3 segundos
+        console.log(`Omitiendo anuncio duplicado para ticket ${ticket.id} - anunciado hace ${timeSinceLastAnnouncement}ms`);
         return true;
       }
     }
     
-    // Update last announced reference
+    // Actualizar referencia del último anunciado
     lastAnnouncedRef.current = {
       id: ticket.id,
       timestamp: Date.now()
     };
     
-    // Find the original room name if this is a redirected ticket
+    // Encontrar el nombre de sala original si este es un ticket redirigido
     let originalRoomName: string | undefined;
     if (ticket.redirectedFrom) {
-      // Try to find the room with the matching service
+      // Intentar encontrar la sala con el servicio coincidente
       const possibleRooms = rooms.filter(
         r => r.service?.code === ticket.redirectedFrom
       );
@@ -133,10 +150,10 @@ export const useTicketAnnouncer = () => {
       }
     }
     
-    // Ensure the ticket has a unique ID to prevent duplicate announcements
+    // Asegurar que el ticket tiene un ID único para prevenir anuncios duplicados
     const updatedTicket = {
       ...ticket,
-      // Ensure we have the latest timestamp for display purposes
+      // Asegurar que tenemos el timestamp más reciente para propósitos de visualización
       calledAt: new Date()
     };
     
@@ -146,35 +163,56 @@ export const useTicketAnnouncer = () => {
       counterName: counterName,
       redirectedFrom: ticket.redirectedFrom,
       originalRoomName: originalRoomName,
-      timestamp: Date.now() // Add timestamp for debugging
+      timestamp: Date.now() // Añadir timestamp para depuración
     };
     
-    console.log("Preparing ticket announcement:", updatedTicket.ticketNumber, "to counter:", counterName);
+    console.log("Preparando anuncio de ticket:", updatedTicket.ticketNumber, "a sala:", counterName);
     
-    // If we don't have a channel yet or if we're already processing, queue the announcement
+    // Si no tenemos un canal todavía o si ya estamos procesando, poner en cola el anuncio
     if (!ticketChannel || isProcessing) {
-      console.log("Queueing announcement because", !ticketChannel ? "no channel" : "already processing");
+      console.log("Poniendo anuncio en cola debido a", !ticketChannel ? "no hay canal" : "ya procesando");
       setAnnouncementQueue(prev => [...prev, announcement]);
       return true;
     }
     
-    // Reset retry counter for this ticket if there is an ID
+    // Reiniciar contador de reintentos para este ticket si hay un ID
     if (ticket && ticket.id) {
       resendAttemptsRef.current.set(ticket.id, 0);
     }
     
     try {
-      // Add a unique messageId to prevent duplicate processing
+      // Añadir un único messageId para prevenir procesamiento duplicado
       const announcementWithId = {
         ...announcement,
         messageId: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
       };
       
+      // Reproducir un sonido silencioso para activar las capacidades de audio en móviles
+      try {
+        const audioContext = new AudioContext();
+        const oscillator = audioContext.createOscillator();
+        oscillator.frequency.setValueAtTime(0, audioContext.currentTime);
+        oscillator.connect(audioContext.destination);
+        oscillator.start();
+        oscillator.stop(audioContext.currentTime + 0.01);
+      } catch (e) {
+        console.log("No se pudo activar audio:", e);
+      }
+      
       ticketChannel.postMessage(announcementWithId);
-      console.log('Ticket announcement sent:', announcementWithId);
+      console.log('Anuncio de ticket enviado:', announcementWithId);
+      
+      // Si estamos en un dispositivo móvil, mostrar toast para indicar que el anuncio fue enviado
+      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+        toast.success("Anuncio enviado a pantallas", {
+          description: `Turno ${ticket.ticketNumber} a ${counterName}`
+        });
+      }
+      
       return true;
     } catch (error) {
-      console.error('Failed to send ticket announcement:', error);
+      console.error('Error al enviar anuncio de ticket:', error);
+      toast.error("Error al enviar anuncio");
       return false;
     }
   }, [ticketChannel, isProcessing]);
