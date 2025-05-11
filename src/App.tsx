@@ -1,10 +1,10 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useEffect } from "react";
-import { setupRealtimeSubscriptions } from "@/lib/supabase";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 
@@ -21,15 +21,11 @@ import ConfigSettings from "./pages/config/Settings";
 import ConfigUsers from "./pages/config/Users";
 import Reports from "./pages/Reports";
 import Notification from "./pages/Notification";
+import FirebaseStatus from "@/components/firebase/FirebaseStatus";
 
 const queryClient = new QueryClient();
 
 const App = () => {
-  useEffect(() => {
-    const cleanup = setupRealtimeSubscriptions();
-    return () => cleanup();
-  }, []);
-
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -37,6 +33,9 @@ const App = () => {
         <Sonner />
         <AuthProvider>
           <BrowserRouter>
+            <div className="mb-4">
+              <FirebaseStatus />
+            </div>
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/display" element={<Display />} />

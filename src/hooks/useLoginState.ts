@@ -1,11 +1,10 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
-import { useToast } from '@/hooks/use-toast';
 import { getCompanySettings } from '@/services/settingsService';
 import { CompanySettings } from '@/lib/types';
 import { useAuth } from '@/contexts/AuthContext';
+import { initializeFirebase } from '@/lib/firebase';
 
 export const useLoginState = () => {
   const [loading, setLoading] = useState(false);
@@ -17,8 +16,7 @@ export const useLoginState = () => {
   const [rememberMe, setRememberMe] = useState(true); // Default to true
   const navigate = useNavigate();
   const location = useLocation();
-  const { toast } = useToast();
-  const { refreshUser } = useAuth();
+  const { user, signIn, refreshUser } = useAuth();
   
   const from = location.state?.from || '/';
 
@@ -43,9 +41,17 @@ export const useLoginState = () => {
       setSessionLoading(true);
       
       try {
-        const { data } = await supabase.auth.getSession();
+        const app = await initializeFirebase();
         
-        if (data.session) {
+        if (!app) {
+          setSessionLoading(false);
+          return;
+        }
+
+        const { getAuth } = await import('firebase/auth');
+        const auth = getAuth(app);
+        
+        if (auth.currentUser) {
           console.log('Login: Active session found, redirecting to:', from);
           navigate(from, { replace: true });
         } else {
@@ -75,22 +81,7 @@ export const useLoginState = () => {
       setLoading(true);
       console.log(`Intentando iniciar sesión con: ${email}`);
       
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-        // No need to specify options here as persistence is configured globally in supabaseInit.ts
-      });
-      
-      if (error) {
-        console.log('Error de autenticación:', error.message);
-        throw error;
-      }
-      
-      toast({
-        title: "Inicio de sesión exitoso",
-        description: "Bienvenido al sistema",
-      });
-      
+      await signIn(email, password);
       await refreshUser(); // Make sure we refresh the user info
       navigate(from, { replace: true });
     } catch (error: any) {
