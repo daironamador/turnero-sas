@@ -1,4 +1,3 @@
-
 import { initializeFirebase } from '@/lib/firebase';
 import { Ticket, ServiceType } from '@/lib/types';
 
@@ -19,6 +18,15 @@ const convertFirestoreTicket = (id: string, data: any): Ticket => {
     redirectedFrom: data.redirected_from,
     previousTicketNumber: data.previous_ticket_number,
   };
+};
+
+// Alias function for backward compatibility
+export const createTicket = async (
+  serviceType: ServiceType,
+  isVip: boolean,
+  patientName?: string
+): Promise<Ticket | null> => {
+  return generateTicket(serviceType, isVip, patientName);
 };
 
 // Get tickets by status
@@ -62,7 +70,7 @@ export const generateTicket = async (
       throw new Error('Firebase not configured');
     }
     
-    const { getFirestore, collection, query, where, orderBy, limit, getDocs, addDoc, serverTimestamp } = await import('firebase/firestore');
+    const { getFirestore, collection, query, where, orderBy, limit, getDocs, addDoc } = await import('firebase/firestore');
     const db = getFirestore(app);
     
     // Get the last ticket number for this service type
@@ -201,7 +209,7 @@ export const redirectTicket = async (ticketId: string, newServiceType: ServiceTy
       throw new Error('Firebase not configured');
     }
     
-    const { getFirestore, doc, getDoc, updateDoc, collection, addDoc } = await import('firebase/firestore');
+    const { getFirestore, doc, getDoc, updateDoc, collection, addDoc, query, where, orderBy, limit, getDocs } = await import('firebase/firestore');
     const db = getFirestore(app);
     
     // Get current ticket
@@ -367,5 +375,63 @@ export const getReportByPeriod = async (period: string): Promise<Ticket[]> => {
   } catch (error) {
     console.error(`Error getting ${period} report:`, error);
     return [];
+  }
+};
+
+// New function for stats
+export const getTodayStats = async () => {
+  try {
+    const app = await initializeFirebase();
+    
+    if (!app) {
+      throw new Error('Firebase not configured');
+    }
+    
+    const { getFirestore, collection, query, where, getDocs } = await import('firebase/firestore');
+    const db = getFirestore(app);
+    
+    // Get today's date range
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    // Query all tickets from today
+    const ticketsRef = collection(db, 'tickets');
+    const todayTicketsQuery = query(
+      ticketsRef,
+      where('created_at', '>=', today.toISOString()),
+      where('created_at', '<', tomorrow.toISOString())
+    );
+    
+    const snapshot = await getDocs(todayTicketsQuery);
+    const tickets = snapshot.docs.map(doc => doc.data());
+    
+    // Count tickets by status
+    const total = tickets.length;
+    const waiting = tickets.filter(t => t.status === 'waiting').length;
+    const serving = tickets.filter(t => t.status === 'serving').length;
+    const completed = tickets.filter(t => t.status === 'completed').length;
+    const cancelled = tickets.filter(t => t.status === 'cancelled').length;
+    const redirected = tickets.filter(t => t.status === 'redirected').length;
+    
+    return {
+      total,
+      waiting,
+      serving,
+      completed,
+      cancelled,
+      redirected
+    };
+  } catch (error) {
+    console.error('Error getting today stats:', error);
+    return {
+      total: 0,
+      waiting: 0,
+      serving: 0,
+      completed: 0,
+      cancelled: 0,
+      redirected: 0
+    };
   }
 };

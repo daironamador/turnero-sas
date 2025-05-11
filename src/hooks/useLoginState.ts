@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { initializeFirebase } from '@/lib/firebase';
+import { signInWithEmailPassword } from '@/services/authService';
 
 // Create a custom hook for fetching company settings from Firebase
 const useCompanySettings = () => {
@@ -43,7 +44,7 @@ export const useLoginState = () => {
   const [rememberMe, setRememberMe] = useState(true); // Default to true
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, signIn, refreshUser } = useAuth();
+  const { user, refreshUser } = useAuth();
   const settings = useCompanySettings();
   
   const from = location.state?.from || '/';
@@ -95,7 +96,7 @@ export const useLoginState = () => {
       setLoading(true);
       console.log(`Intentando iniciar sesión con: ${email}`);
       
-      await signIn(email, password);
+      await signInWithEmailPassword(email, password);
       await refreshUser(); // Make sure we refresh the user info
       navigate(from, { replace: true });
     } catch (error: any) {
