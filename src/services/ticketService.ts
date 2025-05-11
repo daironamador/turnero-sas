@@ -1,385 +1,371 @@
-import { supabase } from '@/lib/supabase';
-import { ServiceType, Ticket } from '@/lib/types';
-import { format } from 'date-fns';
 
-// Obtener tickets de hoy
-export const getTodayTickets = async (): Promise<Ticket[]> => {
-  const today = new Date();
-  const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
-  const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).toISOString();
+import { initializeFirebase } from '@/lib/firebase';
+import { Ticket, ServiceType } from '@/lib/types';
 
-  const { data, error } = await supabase
-    .from('tickets')
-    .select('*')
-    .gte('created_at', startOfDay)
-    .lt('created_at', endOfDay);
-
-  if (error) {
-    console.error('Error al obtener tickets de hoy:', error);
-    throw error;
-  }
-
-  return data.map(mapDatabaseTicketToTicket);
+// Helper function to convert Firestore ticket data to our Ticket type
+const convertFirestoreTicket = (id: string, data: any): Ticket => {
+  return {
+    id,
+    ticketNumber: data.ticket_number,
+    serviceType: data.service_type as ServiceType,
+    status: data.status,
+    isVip: data.is_vip,
+    createdAt: new Date(data.created_at),
+    calledAt: data.called_at ? new Date(data.called_at) : undefined,
+    completedAt: data.completed_at ? new Date(data.completed_at) : undefined,
+    counterNumber: data.counter_number,
+    patientName: data.patient_name,
+    redirectedTo: data.redirected_to,
+    redirectedFrom: data.redirected_from,
+    previousTicketNumber: data.previous_ticket_number,
+  };
 };
 
-// Obtener tickets por estado
+// Get tickets by status
 export const getTicketsByStatus = async (status: string): Promise<Ticket[]> => {
-  const { data, error } = await supabase
-    .from('tickets')
-    .select('*')
-    .eq('status', status);
-
-  if (error) {
-    console.error('Error al obtener tickets por estado:', error);
-    throw error;
+  try {
+    const app = await initializeFirebase();
+    
+    if (!app) {
+      throw new Error('Firebase not configured');
+    }
+    
+    const { getFirestore, collection, query, where, orderBy, getDocs } = await import('firebase/firestore');
+    const db = getFirestore(app);
+    
+    const ticketsRef = collection(db, 'tickets');
+    const ticketsQuery = query(
+      ticketsRef,
+      where('status', '==', status),
+      orderBy('created_at', 'asc')
+    );
+    
+    const snapshot = await getDocs(ticketsQuery);
+    
+    return snapshot.docs.map(doc => convertFirestoreTicket(doc.id, doc.data()));
+  } catch (error) {
+    console.error(`Error getting ${status} tickets:`, error);
+    return [];
   }
-
-  return data.map(mapDatabaseTicketToTicket);
 };
 
-// Generar número de ticket secuencial
-export const generateTicketNumber = async (serviceType: ServiceType): Promise<string> => {
-  // Obtener tickets de hoy para este tipo de servicio para encontrar el número más alto
-  const today = new Date();
-  const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
-  const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).toISOString();
-
-  const { data, error } = await supabase
-    .from('tickets')
-    .select('ticket_number')
-    .eq('service_type', serviceType)
-    .gte('created_at', startOfDay)
-    .lt('created_at', endOfDay)
-    .order('ticket_number', { ascending: false })
-    .limit(1);
-
-  if (error) {
-    console.error('Error generando número de ticket:', error);
-    throw error;
-  }
-
-  let nextNumber = 1;
-  
-  if (data && data.length > 0) {
-    // Extraer la parte numérica e incrementar
-    const lastTicket = data[0].ticket_number;
-    const numberPart = parseInt(lastTicket.substring(2), 10);
-    nextNumber = isNaN(numberPart) ? 1 : numberPart + 1;
-  }
-
-  // Formatear con ceros a la izquierda (001, 002, etc.)
-  return `${serviceType}${nextNumber.toString().padStart(3, '0')}`;
-};
-
-// Crear un nuevo ticket
-export const createTicket = async (serviceType: ServiceType, isVip: boolean, patientName?: string): Promise<Ticket> => {
-  const ticketNumber = await generateTicketNumber(serviceType);
-  
-  const newTicket = {
-    ticket_number: ticketNumber,
-    service_type: serviceType,
-    status: 'waiting',
-    is_vip: isVip,
-    patient_name: patientName || null
-  };
-
-  const { data, error } = await supabase
-    .from('tickets')
-    .insert([newTicket])
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error al crear ticket:', error);
-    throw error;
-  }
-
-  return mapDatabaseTicketToTicket(data);
-};
-
-// Actualizar el estado de un ticket
-export const updateTicketStatus = async (id: string, status: string, updates: any = {}): Promise<Ticket> => {
-  const ticketUpdate = {
-    status,
-    ...updates,
-  };
-
-  const { data, error } = await supabase
-    .from('tickets')
-    .update(ticketUpdate)
-    .eq('id', id)
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error al actualizar ticket:', error);
-    throw error;
-  }
-
-  return mapDatabaseTicketToTicket(data);
-};
-
-// Llamar a un ticket (cambiar estado a serving)
-export const callTicket = async (id: string, counterNumber: string): Promise<Ticket> => {
-  return updateTicketStatus(id, 'serving', { 
-    called_at: new Date().toISOString(),
-    counter_number: counterNumber 
-  });
-};
-
-// Completar un ticket
-export const completeTicket = async (id: string): Promise<Ticket> => {
-  return updateTicketStatus(id, 'completed', { 
-    completed_at: new Date().toISOString() 
-  });
-};
-
-// Cancelar un ticket
-export const cancelTicket = async (id: string): Promise<Ticket> => {
-  return updateTicketStatus(id, 'cancelled', { 
-    completed_at: new Date().toISOString() 
-  });
-};
-
-// Redirigir un ticket
-export const redirectTicket = async (
-  id: string, 
-  targetServiceType: ServiceType,
+// Generate new ticket
+export const generateTicket = async (
+  serviceType: ServiceType,
+  isVip: boolean,
   patientName?: string
-): Promise<{ oldTicket: Ticket, newTicket: Ticket }> => {
-  // Obtener el ticket actual
-  const { data: currentTicket, error: fetchError } = await supabase
-    .from('tickets')
-    .select('*')
-    .eq('id', id)
-    .single();
+): Promise<Ticket | null> => {
+  try {
+    const app = await initializeFirebase();
+    
+    if (!app) {
+      throw new Error('Firebase not configured');
+    }
+    
+    const { getFirestore, collection, query, where, orderBy, limit, getDocs, addDoc, serverTimestamp } = await import('firebase/firestore');
+    const db = getFirestore(app);
+    
+    // Get the last ticket number for this service type
+    const ticketsRef = collection(db, 'tickets');
+    const lastTicketQuery = query(
+      ticketsRef,
+      where('service_type', '==', serviceType),
+      orderBy('created_at', 'desc'),
+      limit(1)
+    );
+    
+    const snapshot = await getDocs(lastTicketQuery);
+    
+    // Generate new ticket number
+    const prefix = serviceType.substring(0, 1).toUpperCase();
+    const nextNumber = snapshot.empty ? 1 : parseInt(snapshot.docs[0].data().ticket_number.substring(1)) + 1;
+    const ticketNumber = `${prefix}${nextNumber.toString().padStart(3, '0')}`;
+    
+    // Create the new ticket
+    const newTicket = {
+      ticket_number: ticketNumber,
+      service_type: serviceType,
+      status: 'waiting',
+      is_vip: isVip,
+      created_at: new Date().toISOString(),
+      patient_name: patientName || null,
+      counter_number: null,
+      called_at: null,
+      completed_at: null,
+      redirected_to: null,
+      redirected_from: null,
+      previous_ticket_number: null,
+    };
+    
+    // Add to Firestore
+    const docRef = await addDoc(ticketsRef, newTicket);
+    
+    // Return the created ticket
+    return {
+      id: docRef.id,
+      ticketNumber,
+      serviceType,
+      status: 'waiting',
+      isVip,
+      createdAt: new Date(),
+      patientName: patientName,
+    };
+  } catch (error) {
+    console.error('Error generating ticket:', error);
+    return null;
+  }
+};
 
-  if (fetchError) {
-    console.error('Error al obtener ticket para redirigir:', fetchError);
-    throw fetchError;
+// Call a ticket
+export const callTicket = async (ticketId: string, counterNumber: string): Promise<boolean> => {
+  try {
+    const app = await initializeFirebase();
+    
+    if (!app) {
+      throw new Error('Firebase not configured');
+    }
+    
+    const { getFirestore, doc, updateDoc } = await import('firebase/firestore');
+    const db = getFirestore(app);
+    
+    // Update the ticket
+    await updateDoc(doc(db, 'tickets', ticketId), {
+      status: 'serving',
+      counter_number: counterNumber,
+      called_at: new Date().toISOString()
+    });
+    
+    return true;
+  } catch (error) {
+    console.error('Error calling ticket:', error);
+    throw new Error('No se pudo llamar al ticket');
   }
-  
-  // Instead of creating a new ticket number, we'll preserve the original ticket number
-  const originalTicketNumber = currentTicket.ticket_number;
-  
-  // Crear el nuevo ticket redirigido
-  const newTicket = {
-    ticket_number: originalTicketNumber, // Keep original ticket number
-    service_type: targetServiceType,
-    status: 'waiting',
-    is_vip: currentTicket.is_vip,
-    patient_name: patientName || currentTicket.patient_name,
-    redirected_from: currentTicket.service_type,
-    previous_ticket_number: currentTicket.ticket_number,
-  };
-  
-  // Insertar el nuevo ticket
-  const { data: createdTicket, error: createError } = await supabase
-    .from('tickets')
-    .insert([newTicket])
-    .select()
-    .single();
-  
-  if (createError) {
-    console.error('Error al crear ticket redirigido:', createError);
-    throw createError;
+};
+
+// Complete a ticket
+export const completeTicket = async (ticketId: string): Promise<boolean> => {
+  try {
+    const app = await initializeFirebase();
+    
+    if (!app) {
+      throw new Error('Firebase not configured');
+    }
+    
+    const { getFirestore, doc, updateDoc } = await import('firebase/firestore');
+    const db = getFirestore(app);
+    
+    // Update the ticket
+    await updateDoc(doc(db, 'tickets', ticketId), {
+      status: 'completed',
+      completed_at: new Date().toISOString()
+    });
+    
+    return true;
+  } catch (error) {
+    console.error('Error completing ticket:', error);
+    throw new Error('No se pudo completar el ticket');
   }
-  
-  // Actualizar el ticket original
-  const { data: updatedTicket, error: updateError } = await supabase
-    .from('tickets')
-    .update({
+};
+
+// Cancel a ticket
+export const cancelTicket = async (ticketId: string): Promise<boolean> => {
+  try {
+    const app = await initializeFirebase();
+    
+    if (!app) {
+      throw new Error('Firebase not configured');
+    }
+    
+    const { getFirestore, doc, updateDoc } = await import('firebase/firestore');
+    const db = getFirestore(app);
+    
+    // Update the ticket
+    await updateDoc(doc(db, 'tickets', ticketId), {
+      status: 'cancelled',
+      completed_at: new Date().toISOString()
+    });
+    
+    return true;
+  } catch (error) {
+    console.error('Error cancelling ticket:', error);
+    throw new Error('No se pudo cancelar el ticket');
+  }
+};
+
+// Redirect a ticket
+export const redirectTicket = async (ticketId: string, newServiceType: ServiceType): Promise<boolean> => {
+  try {
+    const app = await initializeFirebase();
+    
+    if (!app) {
+      throw new Error('Firebase not configured');
+    }
+    
+    const { getFirestore, doc, getDoc, updateDoc, collection, addDoc } = await import('firebase/firestore');
+    const db = getFirestore(app);
+    
+    // Get current ticket
+    const ticketRef = doc(db, 'tickets', ticketId);
+    const ticketSnap = await getDoc(ticketRef);
+    
+    if (!ticketSnap.exists()) {
+      throw new Error('El ticket no existe');
+    }
+    
+    const ticketData = ticketSnap.data();
+    
+    // Generate new ticket number for the redirected service
+    const prefix = newServiceType.substring(0, 1).toUpperCase();
+    const lastTicketQuery = query(
+      collection(db, 'tickets'),
+      where('service_type', '==', newServiceType),
+      orderBy('created_at', 'desc'),
+      limit(1)
+    );
+    
+    const snapshot = await getDocs(lastTicketQuery);
+    const nextNumber = snapshot.empty ? 1 : parseInt(snapshot.docs[0].data().ticket_number.substring(1)) + 1;
+    const newTicketNumber = `${prefix}${nextNumber.toString().padStart(3, '0')}`;
+    
+    // Create new ticket
+    const newTicket = {
+      ticket_number: newTicketNumber,
+      service_type: newServiceType,
+      status: 'waiting',
+      is_vip: ticketData.is_vip,
+      created_at: new Date().toISOString(),
+      patient_name: ticketData.patient_name,
+      counter_number: null,
+      called_at: null,
+      completed_at: null,
+      redirected_to: null,
+      redirected_from: ticketData.service_type,
+      previous_ticket_number: ticketData.ticket_number,
+    };
+    
+    // Add new ticket to Firestore
+    await addDoc(collection(db, 'tickets'), newTicket);
+    
+    // Update original ticket as redirected
+    await updateDoc(ticketRef, {
       status: 'redirected',
       completed_at: new Date().toISOString(),
-      redirected_to: targetServiceType
-    })
-    .eq('id', id)
-    .select()
-    .single();
-  
-  if (updateError) {
-    console.error('Error al actualizar ticket original:', updateError);
-    throw updateError;
+      redirected_to: newServiceType
+    });
+    
+    return true;
+  } catch (error) {
+    console.error('Error redirecting ticket:', error);
+    throw new Error('No se pudo redirigir el ticket');
   }
-  
-  return {
-    oldTicket: mapDatabaseTicketToTicket(updatedTicket),
-    newTicket: mapDatabaseTicketToTicket(createdTicket)
-  };
 };
 
-// Recall a previously completed/redirected/cancelled ticket
-export const recallTicket = async (id: string, counterNumber: string): Promise<Ticket> => {
-  // First get the ticket details
-  const { data: ticketData, error: fetchError } = await supabase
-    .from('tickets')
-    .select('*')
-    .eq('id', id)
-    .single();
-  
-  if (fetchError) {
-    console.error('Error fetching ticket to recall:', fetchError);
-    throw fetchError;
-  }
-  
-  // Now update the ticket to 'serving' status
-  const { data, error } = await supabase
-    .from('tickets')
-    .update({
+// Recall a ticket
+export const recallTicket = async (ticketId: string, counterNumber: string): Promise<boolean> => {
+  try {
+    const app = await initializeFirebase();
+    
+    if (!app) {
+      throw new Error('Firebase not configured');
+    }
+    
+    const { getFirestore, doc, getDoc, collection, addDoc } = await import('firebase/firestore');
+    const db = getFirestore(app);
+    
+    // Get current ticket
+    const ticketRef = doc(db, 'tickets', ticketId);
+    const ticketSnap = await getDoc(ticketRef);
+    
+    if (!ticketSnap.exists()) {
+      throw new Error('El ticket no existe');
+    }
+    
+    const ticketData = ticketSnap.data();
+    
+    // Create new ticket with same number but serving status
+    const newTicket = {
+      ticket_number: ticketData.ticket_number,
+      service_type: ticketData.service_type,
       status: 'serving',
+      is_vip: ticketData.is_vip,
+      created_at: new Date().toISOString(),
       called_at: new Date().toISOString(),
+      completed_at: null,
       counter_number: counterNumber,
-      completed_at: null // Clear the completed timestamp
-    })
-    .eq('id', id)
-    .select()
-    .single();
-  
-  if (error) {
+      patient_name: ticketData.patient_name,
+      redirected_to: null,
+      redirected_from: null,
+      previous_ticket_number: null,
+    };
+    
+    // Add new ticket to Firestore
+    const docRef = await addDoc(collection(db, 'tickets'), newTicket);
+    
+    return true;
+  } catch (error) {
     console.error('Error recalling ticket:', error);
-    throw error;
+    throw new Error('No se pudo rellamar al ticket');
   }
-  
-  return mapDatabaseTicketToTicket(data);
 };
 
-// Función auxiliar para mapear campos de la base de datos a nuestros tipos locales
-function mapDatabaseTicketToTicket(dbTicket: any): Ticket {
-  return {
-    id: dbTicket.id,
-    ticketNumber: dbTicket.ticket_number,
-    serviceType: dbTicket.service_type as ServiceType,
-    status: dbTicket.status as 'waiting' | 'serving' | 'completed' | 'cancelled' | 'redirected',
-    isVip: dbTicket.is_vip,
-    createdAt: new Date(dbTicket.created_at),
-    calledAt: dbTicket.called_at ? new Date(dbTicket.called_at) : undefined,
-    completedAt: dbTicket.completed_at ? new Date(dbTicket.completed_at) : undefined,
-    counterNumber: dbTicket.counter_number,
-    patientName: dbTicket.patient_name,
-    redirectedTo: dbTicket.redirected_to as ServiceType | undefined,
-    redirectedFrom: dbTicket.redirected_from as ServiceType | undefined,
-    previousTicketNumber: dbTicket.previous_ticket_number,
-  };
-}
-
-// Obtener estadísticas de los tickets de hoy
-export const getTodayStats = async () => {
-  const now = new Date();
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-  const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
-
-  // Obtener conteos de tickets por estado para hoy
-  const { data: waitingData, error: waitingError, count: waitingCount } = await supabase
-    .from('tickets')
-    .select('*', { count: 'exact', head: true })
-    .eq('status', 'waiting')
-    .gte('created_at', startOfDay)
-    .lt('created_at', endOfDay);
-
-  const { data: servingData, error: servingError, count: servingCount } = await supabase
-    .from('tickets')
-    .select('*', { count: 'exact', head: true })
-    .eq('status', 'serving')
-    .gte('created_at', startOfDay)
-    .lt('created_at', endOfDay);
-
-  const { data: completedData, error: completedError, count: completedCount } = await supabase
-    .from('tickets')
-    .select('*', { count: 'exact', head: true })
-    .eq('status', 'completed')
-    .gte('created_at', startOfDay)
-    .lt('created_at', endOfDay);
-
-  const { data: cancelledData, error: cancelledError, count: cancelledCount } = await supabase
-    .from('tickets')
-    .select('*', { count: 'exact', head: true })
-    .eq('status', 'cancelled')
-    .gte('created_at', startOfDay)
-    .lt('created_at', endOfDay);
-
-  if (waitingError || servingError || completedError || cancelledError) {
-    console.error('Error getting statistics:', waitingError || servingError || completedError || cancelledError);
-    throw new Error('No se pudieron obtener las estadísticas de tickets');
+// Get tickets for reports
+export const getTicketsReport = async (startDate: Date, endDate: Date): Promise<Ticket[]> => {
+  try {
+    const app = await initializeFirebase();
+    
+    if (!app) {
+      throw new Error('Firebase not configured');
+    }
+    
+    const { getFirestore, collection, query, where, getDocs } = await import('firebase/firestore');
+    const db = getFirestore(app);
+    
+    // Query tickets within date range
+    const ticketsRef = collection(db, 'tickets');
+    const ticketsQuery = query(
+      ticketsRef,
+      where('created_at', '>=', startDate.toISOString()),
+      where('created_at', '<=', endDate.toISOString())
+    );
+    
+    const snapshot = await getDocs(ticketsQuery);
+    
+    return snapshot.docs.map(doc => convertFirestoreTicket(doc.id, doc.data()));
+  } catch (error) {
+    console.error('Error getting ticket report:', error);
+    return [];
   }
-
-  return {
-    waiting: waitingCount || 0,
-    serving: servingCount || 0,
-    completed: completedCount || 0,
-    cancelled: cancelledCount || 0,
-    total: (waitingCount || 0) + (servingCount || 0) + (completedCount || 0) + (cancelledCount || 0)
-  };
 };
 
-// Obtener datos de reportes por rango de tiempo
-export const getTicketsReport = async (
-  startDate: Date, 
-  endDate: Date
-): Promise<Ticket[]> => {
-  const { data, error } = await supabase
-    .from('tickets')
-    .select('*')
-    .gte('created_at', startDate.toISOString())
-    .lt('created_at', endDate.toISOString())
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    console.error('Error al obtener reporte de tickets:', error);
-    throw error;
-  }
-
-  return data.map(mapDatabaseTicketToTicket);
-};
-
-// Obtener tickets específicamente para reportes por período
-export const getReportByPeriod = async (
-  period: 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom',
-  startDate?: Date,
-  endDate?: Date
-): Promise<Ticket[]> => {
-  const today = new Date();
-  let queryStartDate: Date;
-  let queryEndDate: Date = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
-  
-  if (period === 'custom' && startDate && endDate) {
-    // Si es período personalizado, usar las fechas proporcionadas
-    queryStartDate = new Date(startDate);
-    queryEndDate = new Date(endDate);
-    // Asegurarse de que la fecha final incluya todo el día
-    queryEndDate.setHours(23, 59, 59, 999);
-  } else {
-    // Para períodos predefinidos
+// Get report by period
+export const getReportByPeriod = async (period: string): Promise<Ticket[]> => {
+  try {
+    const now = new Date();
+    let startDate: Date;
+    
     switch(period) {
       case 'daily':
-        queryStartDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         break;
       case 'weekly':
-        const day = today.getDay();
-        const diff = today.getDate() - day + (day === 0 ? -6 : 1); // Ajustar cuando el día es domingo
-        queryStartDate = new Date(today.getFullYear(), today.getMonth(), diff);
+        // Set to Monday of current week
+        const day = now.getDay();
+        const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+        startDate = new Date(now.getFullYear(), now.getMonth(), diff);
         break;
       case 'monthly':
-        queryStartDate = new Date(today.getFullYear(), today.getMonth(), 1);
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
         break;
       case 'yearly':
-        queryStartDate = new Date(today.getFullYear(), 0, 1);
+        startDate = new Date(now.getFullYear(), 0, 1);
         break;
       default:
-        queryStartDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     }
+    
+    return await getTicketsReport(startDate, now);
+  } catch (error) {
+    console.error(`Error getting ${period} report:`, error);
+    return [];
   }
-  
-  const { data, error } = await supabase
-    .from('tickets')
-    .select('*')
-    .gte('created_at', queryStartDate.toISOString())
-    .lt('created_at', queryEndDate.toISOString())
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    console.error(`Error al obtener reporte ${period}:`, error);
-    throw error;
-  }
-
-  return data.map(mapDatabaseTicketToTicket);
 };

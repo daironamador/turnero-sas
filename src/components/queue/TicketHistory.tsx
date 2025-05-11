@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -9,7 +8,7 @@ import { Ticket, Room, Service } from '@/lib/types';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from 'sonner';
-import { supabase } from '@/lib/supabase';
+import { initializeFirebase } from '@/lib/firebase';
 
 interface TicketHistoryProps {
   counterNumber: string;
@@ -31,35 +30,50 @@ const TicketHistory: React.FC<TicketHistoryProps> = ({
     setIsLoading(true);
     
     try {
+      const app = await initializeFirebase();
+      
+      if (!app) {
+        throw new Error('Firebase not configured');
+      }
+      
+      const { getFirestore, collection, query, where, orderBy, limit, getDocs } = await import('firebase/firestore');
+      const db = getFirestore(app);
+      
+      // Get today's date at midnight
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
-      const { data, error } = await supabase
-        .from('tickets')
-        .select('*')
-        .eq('counter_number', counterNumber)
-        .gte('created_at', today.toISOString())
-        .in('status', ['completed', 'redirected', 'cancelled'])
-        .order('completed_at', { ascending: false })
-        .limit(20);
+      // Query tickets completed at this counter today
+      const ticketsRef = collection(db, 'tickets');
+      const ticketsQuery = query(
+        ticketsRef,
+        where('counter_number', '==', counterNumber),
+        where('created_at', '>=', today.toISOString()),
+        where('status', 'in', ['completed', 'redirected', 'cancelled']),
+        orderBy('created_at', 'desc'),
+        limit(20)
+      );
       
-      if (error) throw error;
+      const snapshot = await getDocs(ticketsQuery);
       
-      const formattedTickets = data.map(ticket => ({
-        id: ticket.id,
-        ticketNumber: ticket.ticket_number,
-        serviceType: ticket.service_type,
-        status: ticket.status,
-        isVip: ticket.is_vip,
-        createdAt: new Date(ticket.created_at),
-        calledAt: ticket.called_at ? new Date(ticket.called_at) : undefined,
-        completedAt: ticket.completed_at ? new Date(ticket.completed_at) : undefined,
-        counterNumber: ticket.counter_number,
-        patientName: ticket.patient_name,
-        redirectedTo: ticket.redirected_to,
-        redirectedFrom: ticket.redirected_from,
-        previousTicketNumber: ticket.previous_ticket_number,
-      }));
+      const formattedTickets = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ticketNumber: data.ticket_number,
+          serviceType: data.service_type,
+          status: data.status,
+          isVip: data.is_vip,
+          createdAt: new Date(data.created_at),
+          calledAt: data.called_at ? new Date(data.called_at) : undefined,
+          completedAt: data.completed_at ? new Date(data.completed_at) : undefined,
+          counterNumber: data.counter_number,
+          patientName: data.patient_name,
+          redirectedTo: data.redirected_to,
+          redirectedFrom: data.redirected_from,
+          previousTicketNumber: data.previous_ticket_number,
+        };
+      });
       
       setTickets(formattedTickets);
     } catch (error) {

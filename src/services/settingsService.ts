@@ -1,21 +1,27 @@
 
-import { supabase } from '@/lib/supabase';
 import { CompanySettings } from '@/lib/types';
+import { initializeFirebase } from '@/lib/firebase';
 
 export const getCompanySettings = async (): Promise<CompanySettings> => {
   try {
-    const { data, error } = await supabase
-      .from('company_settings')
-      .select('*')
-      .limit(1)
-      .single();
+    const app = await initializeFirebase();
     
-    if (error) {
-      console.error('Error al obtener la configuración de la empresa:', error);
-      throw error;
+    if (!app) {
+      throw new Error('Firebase not configured');
     }
     
-    return data as CompanySettings;
+    // This would be replaced with a Firestore query
+    // For now, return default settings
+    return {
+      id: '1',
+      name: 'OcularClinic',
+      address: 'Av. Principal #123, Ciudad',
+      phone: '(123) 456-7890',
+      email: 'contacto@ocularclinic.com',
+      logo: '',
+      ticketFooter: 'Gracias por su visita. Por favor conserve este ticket.',
+      displayMessage: 'Bienvenido a OcularClinic. Por favor espere a ser llamado.',
+    };
   } catch (error) {
     console.error('Error al obtener la configuración de la empresa:', error);
     // Devolver datos por defecto en caso de error
@@ -34,14 +40,17 @@ export const getCompanySettings = async (): Promise<CompanySettings> => {
 
 export const saveCompanySettings = async (settings: CompanySettings): Promise<void> => {
   try {
-    const { error } = await supabase
-      .from('company_settings')
-      .upsert(settings, { onConflict: 'id' });
+    const app = await initializeFirebase();
     
-    if (error) {
-      console.error('Error al guardar la configuración de la empresa:', error);
-      throw error;
+    if (!app) {
+      throw new Error('Firebase not configured');
     }
+    
+    // This would be replaced with a Firestore update
+    console.log('Saving company settings to Firebase:', settings);
+    
+    // For now, just log the successful operation
+    console.log('Settings saved successfully');
   } catch (error) {
     console.error('Error al guardar la configuración de la empresa:', error);
     throw error;

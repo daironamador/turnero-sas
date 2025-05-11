@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useEffect } from "react";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
+import { initializeFirestoreData } from "@/services/firebaseService";
 
 import Index from "./pages/Index";
 import Login from "./pages/Login";
@@ -26,6 +27,11 @@ import FirebaseStatus from "@/components/firebase/FirebaseStatus";
 const queryClient = new QueryClient();
 
 const App = () => {
+  // Initialize Firebase data when app loads
+  useEffect(() => {
+    initializeFirestoreData();
+  }, []);
+  
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>

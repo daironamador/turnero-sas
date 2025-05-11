@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { initializeFirebase } from '@/lib/firebase';
 
 export const useRooms = () => {
   const [rooms, setRooms] = useState<{[key: string]: string}>({});
@@ -10,17 +10,25 @@ export const useRooms = () => {
     const fetchRooms = async () => {
       setLoading(true);
       try {
-        const { data, error } = await supabase
-          .from('rooms')
-          .select('id, name, number');
+        const app = await initializeFirebase();
         
-        if (!error && data) {
-          const roomsMap: {[key: string]: string} = {};
-          data.forEach(room => {
-            roomsMap[room.id] = `${room.number} - ${room.name}`;
-          });
-          setRooms(roomsMap);
+        if (!app) {
+          throw new Error('Firebase not configured');
         }
+        
+        const { getFirestore, collection, getDocs } = await import('firebase/firestore');
+        const db = getFirestore(app);
+        
+        const roomsRef = collection(db, 'rooms');
+        const snapshot = await getDocs(roomsRef);
+        
+        const roomsMap: {[key: string]: string} = {};
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          roomsMap[doc.id] = `${data.number} - ${data.name}`;
+        });
+        
+        setRooms(roomsMap);
       } catch (error) {
         console.error('Error fetching rooms:', error);
       } finally {

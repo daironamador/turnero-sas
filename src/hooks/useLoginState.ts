@@ -1,10 +1,38 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { getCompanySettings } from '@/services/settingsService';
-import { CompanySettings } from '@/lib/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { initializeFirebase } from '@/lib/firebase';
+
+// Create a custom hook for fetching company settings from Firebase
+const useCompanySettings = () => {
+  const [settings, setSettings] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        // For now, we'll use default settings
+        // This would be replaced with a Firestore query in the future
+        setSettings({
+          id: '1',
+          name: 'OcularClinic',
+          address: 'Av. Principal #123, Ciudad',
+          phone: '(123) 456-7890',
+          email: 'contacto@ocularclinic.com',
+          logo: '',
+          ticketFooter: 'Gracias por su visita. Por favor conserve este ticket.',
+          displayMessage: 'Bienvenido a OcularClinic. Por favor espere a ser llamado.',
+        });
+      } catch (error) {
+        console.error('Error loading settings:', error);
+      }
+    };
+    
+    fetchSettings();
+  }, []);
+
+  return settings;
+};
 
 export const useLoginState = () => {
   const [loading, setLoading] = useState(false);
@@ -12,27 +40,13 @@ export const useLoginState = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [settings, setSettings] = useState<CompanySettings | null>(null);
   const [rememberMe, setRememberMe] = useState(true); // Default to true
   const navigate = useNavigate();
   const location = useLocation();
   const { user, signIn, refreshUser } = useAuth();
+  const settings = useCompanySettings();
   
   const from = location.state?.from || '/';
-
-  // Load company settings
-  useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        const data = await getCompanySettings();
-        setSettings(data);
-      } catch (error) {
-        console.error('Error al cargar configuración:', error);
-      }
-    };
-    
-    loadSettings();
-  }, []);
 
   // Check for existing session
   useEffect(() => {

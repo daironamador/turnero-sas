@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { User, Service } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { supabase, createUser } from '@/integrations/supabase/client';
+import { initializeFirebase } from '@/lib/firebase';
 
 export const useUserManagement = () => {
   const { toast } = useToast();
@@ -13,51 +13,56 @@ export const useUserManagement = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Load real users and services from Supabase
+  // Load users and services from Firebase
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
       try {
-        // Load services
-        const { data: servicesData, error: servicesError } = await supabase
-          .from('services')
-          .select('*');
-          
-        if (servicesError) {
-          throw servicesError;
+        const app = await initializeFirebase();
+        
+        if (!app) {
+          throw new Error('Firebase not configured');
         }
         
-        // Load users
-        const { data: usersData, error: usersError } = await supabase
-          .from('users')
-          .select('*');
-          
-        if (usersError) {
-          throw usersError;
-        }
+        const { getFirestore, collection, getDocs } = await import('firebase/firestore');
+        const db = getFirestore(app);
+        
+        // Load services
+        const servicesRef = collection(db, 'services');
+        const servicesSnapshot = await getDocs(servicesRef);
         
         // Transform services data to match our Service type
-        const transformedServices: Service[] = servicesData.map(service => ({
-          id: service.id,
-          code: service.code,
-          name: service.name,
-          description: service.description || undefined,
-          isActive: service.is_active,
-          createdAt: new Date(service.created_at)
-        }));
+        const transformedServices: Service[] = servicesSnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            code: data.code,
+            name: data.name,
+            description: data.description || undefined,
+            isActive: data.is_active,
+            createdAt: new Date(data.created_at)
+          };
+        });
+        
+        // Load users
+        const usersRef = collection(db, 'users');
+        const usersSnapshot = await getDocs(usersRef);
         
         // Transform users data to match our User type
-        const transformedUsers: User[] = usersData.map(user => ({
-          id: user.id,
-          username: user.username,
-          name: user.name,
-          email: user.email,
-          role: (user.role as "admin" | "operator" | "viewer"),
-          isActive: user.is_active,
-          serviceIds: user.service_ids || [],
-          services: transformedServices.filter(s => (user.service_ids || []).includes(s.id)),
-          createdAt: new Date(user.created_at)
-        }));
+        const transformedUsers: User[] = usersSnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            username: data.username,
+            name: data.name,
+            email: data.email,
+            role: (data.role as "admin" | "operator" | "viewer"),
+            isActive: data.is_active,
+            serviceIds: data.service_ids || [],
+            services: transformedServices.filter(s => (data.service_ids || []).includes(s.id)),
+            createdAt: new Date(data.created_at)
+          };
+        });
         
         setServices(transformedServices);
         setUsers(transformedUsers);
@@ -74,21 +79,30 @@ export const useUserManagement = () => {
 
   const handleSaveUser = async (userData: Partial<User>, password?: string) => {
     try {
+      const app = await initializeFirebase();
+      
+      if (!app) {
+        throw new Error('Firebase not configured');
+      }
+      
+      const { getFirestore, doc, setDoc, updateDoc, collection, addDoc, getAuth, createUserWithEmailAndPassword } = await import('firebase/firestore');
+      const { getAuth: importGetAuth } = await import('firebase/auth');
+      
+      const db = getFirestore(app);
+      const auth = importGetAuth(app);
+      
       if (currentUser) {
         // Update existing user
-        const { error } = await supabase
-          .from('users')
-          .update({
-            username: userData.username,
-            name: userData.name,
-            email: userData.email,
-            role: userData.role,
-            is_active: userData.isActive,
-            service_ids: userData.serviceIds
-          })
-          .eq('id', currentUser.id);
-          
-        if (error) throw error;
+        const userDocRef = doc(db, 'users', currentUser.id);
+        
+        await updateDoc(userDocRef, {
+          username: userData.username,
+          name: userData.name,
+          email: userData.email,
+          role: userData.role,
+          is_active: userData.isActive,
+          service_ids: userData.serviceIds
+        });
         
         // Update local state
         const updatedUsers = users.map(u => {
@@ -109,65 +123,31 @@ export const useUserManagement = () => {
           description: `Se ha actualizado el usuario ${userData.name}`,
         });
       } else {
-        // Create new user with auth
+        // Create new user with Firebase Auth
         if (!password) {
           throw new Error('Se requiere contraseña para crear un nuevo usuario');
         }
         
-        const { user, error, message } = await createUser(
-          userData.email || '',
-          password,
-          {
-            name: userData.name,
+        try {
+          // Create user in Firebase Auth
+          const userCredential = await createUserWithEmailAndPassword(auth, userData.email || '', password);
+          const userId = userCredential.user.uid;
+          
+          // Create user document in Firestore
+          const now = new Date().toISOString();
+          await setDoc(doc(db, 'users', userId), {
             username: userData.username,
-            role: userData.role,
-            serviceIds: userData.serviceIds
-          }
-        );
-        
-        if (error) {
-          // Special handling for email rate limit error
-          if (error.name === 'EmailRateLimit') {
-            toast({
-              title: "Usuario creado con advertencia",
-              description: error.message,
-              variant: "default"
-            });
-            
-            // Get the created user from the database to add to UI
-            const { data: newUserData } = await supabase
-              .from('users')
-              .select('*')
-              .eq('email', userData.email)
-              .single();
-              
-            if (newUserData) {
-              const newUser: User = {
-                id: newUserData.id,
-                username: newUserData.username,
-                name: newUserData.name,
-                email: newUserData.email,
-                role: newUserData.role as 'admin' | 'operator' | 'viewer',
-                isActive: newUserData.is_active,
-                serviceIds: newUserData.service_ids || [],
-                services: services.filter(s => (newUserData.service_ids || []).includes(s.id)),
-                createdAt: new Date(newUserData.created_at),
-              };
-              
-              setUsers([...users, newUser]);
-              setIsDialogOpen(false);
-              setCurrentUser(undefined);
-              return;
-            }
-          } else {
-            throw error;
-          }
-        }
-        
-        if (user) {
+            name: userData.name,
+            email: userData.email,
+            role: userData.role || 'operator',
+            is_active: userData.isActive !== undefined ? userData.isActive : true,
+            service_ids: userData.serviceIds || [],
+            created_at: now
+          });
+          
           // Add to local state
           const newUser: User = {
-            id: user.id,
+            id: userId,
             username: userData.username || '',
             name: userData.name || '',
             email: userData.email || '',
@@ -175,14 +155,24 @@ export const useUserManagement = () => {
             isActive: userData.isActive !== undefined ? userData.isActive : true,
             serviceIds: userData.serviceIds || [],
             services: services.filter(s => (userData.serviceIds || []).includes(s.id)),
-            createdAt: new Date(),
+            createdAt: new Date(now),
           };
           
           setUsers([...users, newUser]);
           toast({
             title: "Usuario creado",
-            description: message || `Se ha creado el usuario ${newUser.name}`,
+            description: `Se ha creado el usuario ${newUser.name}`,
           });
+        } catch (error: any) {
+          if (error.code === 'auth/email-already-in-use') {
+            toast({
+              title: "Error",
+              description: "El correo electrónico ya está en uso",
+              variant: "destructive"
+            });
+          } else {
+            throw error;
+          }
         }
       }
       
@@ -200,18 +190,24 @@ export const useUserManagement = () => {
 
   const toggleUserStatus = async (id: string) => {
     try {
+      const app = await initializeFirebase();
+      
+      if (!app) {
+        throw new Error('Firebase not configured');
+      }
+      
+      const { getFirestore, doc, updateDoc } = await import('firebase/firestore');
+      const db = getFirestore(app);
+      
       const user = users.find(u => u.id === id);
       if (!user) return;
       
       const newStatus = !user.isActive;
       
       // Update in database
-      const { error } = await supabase
-        .from('users')
-        .update({ is_active: newStatus })
-        .eq('id', id);
-        
-      if (error) throw error;
+      await updateDoc(doc(db, 'users', id), { 
+        is_active: newStatus 
+      });
       
       // Update in local state
       const updatedUsers = users.map(user => {

@@ -8,6 +8,8 @@ export function useFirebaseAuth() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string>('viewer');
+  const [isPersistent, setPersistent] = useState<boolean>(true);
+  const [lastRefreshed, setLastRefreshed] = useState<number>(Date.now());
 
   useEffect(() => {
     const initAuth = async () => {
@@ -42,7 +44,7 @@ export function useFirebaseAuth() {
             setUserRole('viewer');
             setLoading(false);
           }
-        }, (authError) => {
+        }, (authError: any) => {
           setError(authError.message);
           setLoading(false);
         });
@@ -132,6 +134,7 @@ export function useFirebaseAuth() {
       if (currentUser) {
         // Force token refresh
         await currentUser.getIdToken(true);
+        setLastRefreshed(Date.now());
         return true;
       }
       
@@ -150,9 +153,9 @@ export function useFirebaseAuth() {
     signOut,
     refreshUser,
     userRole,
-    session: user ? { user } : null, // Compatible with Supabase interface
-    isPersistent: true,
-    lastRefreshed: Date.now()
+    session: user ? { user } : null, // Compatible with previous interface
+    isPersistent,
+    lastRefreshed
   };
 }
 
