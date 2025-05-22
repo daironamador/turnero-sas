@@ -14,26 +14,26 @@ export const getCompanySettings = async (): Promise<CompanySettings> => {
     // For now, return default settings
     return {
       id: '1',
-      name: 'OcularClinic',
+      name: 'TOKEN ASSISTANT',
       address: 'Av. Principal #123, Ciudad',
       phone: '(123) 456-7890',
-      email: 'contacto@ocularclinic.com',
+      email: 'contacto@tokenassistant.com',
       logo: '',
       ticketFooter: 'Gracias por su visita. Por favor conserve este ticket.',
-      displayMessage: 'Bienvenido a OcularClinic. Por favor espere a ser llamado.',
+      displayMessage: 'Bienvenido a TOKEN ASSISTANT. Por favor espere a ser llamado.',
     };
   } catch (error) {
     console.error('Error al obtener la configuración de la empresa:', error);
     // Devolver datos por defecto en caso de error
     return {
       id: '1',
-      name: 'OcularClinic',
+      name: 'TOKEN ASSISTANT',
       address: 'Av. Principal #123, Ciudad',
       phone: '(123) 456-7890',
-      email: 'contacto@ocularclinic.com',
+      email: 'contacto@tokenassistant.com',
       logo: '',
       ticketFooter: 'Gracias por su visita. Por favor conserve este ticket.',
-      displayMessage: 'Bienvenido a OcularClinic. Por favor espere a ser llamado.',
+      displayMessage: 'Bienvenido a TOKEN ASSISTANT. Por favor espere a ser llamado.',
     };
   }
 };

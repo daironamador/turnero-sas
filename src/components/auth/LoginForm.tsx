@@ -45,7 +45,7 @@ const LoginForm: React.FC<LoginFormProps> = ({
             />
           ) : (
             <div className="h-16 w-16 bg-gray-200 rounded-full flex items-center justify-center">
-              <span className="text-2xl font-bold text-gray-500">CO</span>
+              <span className="text-2xl font-bold text-gray-500">TA</span>
             </div>
           )}
         </div>

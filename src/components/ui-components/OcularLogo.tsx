@@ -32,7 +32,7 @@ const OcularLogo: React.FC<OcularLogoProps> = ({
           'ml-2 text-xl font-semibold tracking-tight text-foreground',
           textClassName
         )}>
-          OcularVision
+          TOKEN ASSISTANT
         </span>
       )}
     </div>

@@ -9,7 +9,218 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      company_settings: {
+        Row: {
+          address: string
+          display_message: string | null
+          email: string
+          id: string
+          logo: string | null
+          name: string
+          phone: string
+          ticket_footer: string | null
+        }
+        Insert: {
+          address: string
+          display_message?: string | null
+          email: string
+          id?: string
+          logo?: string | null
+          name: string
+          phone: string
+          ticket_footer?: string | null
+        }
+        Update: {
+          address?: string
+          display_message?: string | null
+          email?: string
+          id?: string
+          logo?: string | null
+          name?: string
+          phone?: string
+          ticket_footer?: string | null
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          active: boolean
+          content: string
+          created_at: string
+          id: string
+          image_url: string | null
+          interval_in_seconds: number
+          title: string
+          type: string
+          youtube_url: string | null
+        }
+        Insert: {
+          active?: boolean
+          content: string
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          interval_in_seconds?: number
+          title: string
+          type: string
+          youtube_url?: string | null
+        }
+        Update: {
+          active?: boolean
+          content?: string
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          interval_in_seconds?: number
+          title?: string
+          type?: string
+          youtube_url?: string | null
+        }
+        Relationships: []
+      }
+      rooms: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          number: string
+          service_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          number: string
+          service_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          number?: string
+          service_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rooms_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      services: {
+        Row: {
+          code: string
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+        }
+        Relationships: []
+      }
+      tickets: {
+        Row: {
+          called_at: string | null
+          completed_at: string | null
+          counter_number: string | null
+          created_at: string
+          id: string
+          is_vip: boolean
+          patient_name: string | null
+          previous_ticket_number: string | null
+          redirected_from: string | null
+          redirected_to: string | null
+          service_type: string
+          status: string
+          ticket_number: string
+        }
+        Insert: {
+          called_at?: string | null
+          completed_at?: string | null
+          counter_number?: string | null
+          created_at?: string
+          id?: string
+          is_vip?: boolean
+          patient_name?: string | null
+          previous_ticket_number?: string | null
+          redirected_from?: string | null
+          redirected_to?: string | null
+          service_type: string
+          status: string
+          ticket_number: string
+        }
+        Update: {
+          called_at?: string | null
+          completed_at?: string | null
+          counter_number?: string | null
+          created_at?: string
+          id?: string
+          is_vip?: boolean
+          patient_name?: string | null
+          previous_ticket_number?: string | null
+          redirected_from?: string | null
+          redirected_to?: string | null
+          service_type?: string
+          status?: string
+          ticket_number?: string
+        }
+        Relationships: []
+      }
+      users: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          is_active: boolean
+          name: string
+          role: string
+          service_ids: string[]
+          username: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          is_active?: boolean
+          name: string
+          role?: string
+          service_ids?: string[]
+          username: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          role?: string
+          service_ids?: string[]
+          username?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

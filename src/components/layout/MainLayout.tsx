@@ -46,7 +46,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             />
           ) : (
             <h1 className="font-semibold text-lg md:text-xl">
-              {settings?.name || 'Sistema de Gestión de Turnos'}
+              {settings?.name || 'TOKEN ASSISTANT'}
             </h1>
           )}
         </div>

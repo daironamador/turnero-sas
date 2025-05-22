@@ -19,7 +19,7 @@ const Header: React.FC = () => {
         <div className="flex">
           <Link to="/" className="flex items-center space-x-2">
             <OcularLogo />
-            <span className="font-semibold">OcularClinic</span>
+            <span className="font-semibold">TOKEN ASSISTANT</span>
           </Link>
         </div>
         <nav className="flex items-center space-x-4 lg:space-x-6">

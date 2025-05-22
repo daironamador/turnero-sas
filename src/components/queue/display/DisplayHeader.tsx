@@ -53,7 +53,7 @@ const DisplayHeader: React.FC = () => {
               className="h-12 w-auto object-contain"
             />
           )}
-          <h1 className="text-3xl font-bold">{settings?.name || 'Centro Oftalmológico'}</h1>
+          <h1 className="text-3xl font-bold">{settings?.name || 'TOKEN ASSISTANT'}</h1>
         </div>
         <div className="text-xl font-medium">{formattedDateTime}</div>
       </div>
