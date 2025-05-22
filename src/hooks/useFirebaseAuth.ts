@@ -44,8 +44,8 @@ export function useFirebaseAuth() {
             setUserRole('viewer');
             setLoading(false);
           }
-        }, (authError: any) => {
-          setError(authError.message);
+        }, (authError) => {
+          setError(authError ? authError.message : "Unknown auth error");
           setLoading(false);
         });
         

@@ -6,6 +6,7 @@ import { getTicketsByStatus } from '@/services/ticketService';
 import { useTicketAnnouncer } from './useTicketAnnouncer';
 import { fetchRoomsWithServices, fetchActiveServices } from './llamada/useRoomService';
 import { useCurrentTicket } from './llamada/useCurrentTicket';
+import { supabase } from '@/lib/supabase';
 
 export function useLlamadaData() {
   const [selectedRoom, setSelectedRoom] = useState<(Room & { service: Service }) | null>(null);
@@ -58,16 +59,19 @@ export function useLlamadaData() {
     fetchCurrentTicket();
   }, [selectedRoom]);
 
-  // Listen for real-time updates
+  // Listen for real-time updates from Supabase
   useEffect(() => {
-    const handleTicketsUpdated = () => {
-      handleTicketChange();
-    };
-
-    window.addEventListener('tickets-updated', handleTicketsUpdated);
+    const channel = supabase.channel('schema-db-changes')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'tickets' }, 
+        () => {
+          handleTicketChange();
+        }
+      )
+      .subscribe();
     
     return () => {
-      window.removeEventListener('tickets-updated', handleTicketsUpdated);
+      supabase.removeChannel(channel);
     };
   }, []);
 

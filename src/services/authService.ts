@@ -1,18 +1,16 @@
 
-import { initializeFirebase } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 
 export const signInWithEmailPassword = async (email: string, password: string) => {
   try {
-    const app = await initializeFirebase();
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
     
-    if (!app) {
-      throw new Error('Firebase not configured');
-    }
+    if (error) throw error;
     
-    const { getAuth, signInWithEmailAndPassword } = await import('firebase/auth');
-    const auth = getAuth(app);
-    
-    return await signInWithEmailAndPassword(auth, email, password);
+    return data;
   } catch (error: any) {
     console.error('Error signing in:', error);
     throw error;
@@ -21,16 +19,14 @@ export const signInWithEmailPassword = async (email: string, password: string) =
 
 export const createUserWithEmailPassword = async (email: string, password: string) => {
   try {
-    const app = await initializeFirebase();
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password
+    });
     
-    if (!app) {
-      throw new Error('Firebase not configured');
-    }
+    if (error) throw error;
     
-    const { getAuth, createUserWithEmailAndPassword } = await import('firebase/auth');
-    const auth = getAuth(app);
-    
-    return await createUserWithEmailAndPassword(auth, email, password);
+    return data;
   } catch (error: any) {
     console.error('Error creating user:', error);
     throw error;

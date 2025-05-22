@@ -1,6 +1,6 @@
 
-import React, { createContext, useContext, useState } from 'react';
-import useFirebaseAuth from '@/hooks/useFirebaseAuth';
+import React, { createContext, useContext } from 'react';
+import useSupabaseAuth from '@/hooks/useSupabaseAuth';
 
 type AuthContextType = {
   session: any | null;
@@ -16,8 +16,8 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Use Firebase auth hook
-  const auth = useFirebaseAuth();
+  // Use Supabase auth hook
+  const auth = useSupabaseAuth();
 
   const value = {
     session: auth.session,
