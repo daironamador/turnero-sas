@@ -68,7 +68,16 @@ export const generateTicket = async (
     
     // Generate new ticket number
     const prefix = serviceType.substring(0, 1).toUpperCase();
-    const nextNumber = lastTicket && lastTicket.ticket_number ? parseInt(lastTicket.ticket_number.substring(1)) + 1 : 1;
+    let nextNumber = 1;
+    
+    if (lastTicket && lastTicket.ticket_number && typeof lastTicket.ticket_number === 'string') {
+      const numberPart = lastTicket.ticket_number.substring(1);
+      const parsedNumber = parseInt(numberPart, 10);
+      if (!isNaN(parsedNumber)) {
+        nextNumber = parsedNumber + 1;
+      }
+    }
+    
     const ticketNumber = `${prefix}${nextNumber.toString().padStart(3, '0')}`;
     
     // Create the new ticket
@@ -213,7 +222,16 @@ export const redirectTicket = async (ticketId: string, newServiceType: ServiceTy
       .maybeSingle(); // Use maybeSingle to handle no results
     
     const prefix = newServiceType.substring(0, 1).toUpperCase();
-    const nextNumber = lastTicket && lastTicket.ticket_number ? parseInt(lastTicket.ticket_number.substring(1)) + 1 : 1;
+    let nextNumber = 1;
+    
+    if (lastTicket && lastTicket.ticket_number && typeof lastTicket.ticket_number === 'string') {
+      const numberPart = lastTicket.ticket_number.substring(1);
+      const parsedNumber = parseInt(numberPart, 10);
+      if (!isNaN(parsedNumber)) {
+        nextNumber = parsedNumber + 1;
+      }
+    }
+    
     const newTicketNumber = `${prefix}${nextNumber.toString().padStart(3, '0')}`;
     
     // Create new ticket
