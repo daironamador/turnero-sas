@@ -58,17 +58,17 @@ export const generateTicket = async (
 ): Promise<Ticket | null> => {
   try {
     // Get the last ticket number for this service type
-    const { data: lastTicket } = await supabase
+    const { data: lastTicket, error: lastTicketError } = await supabase
       .from('tickets')
       .select('ticket_number')
       .eq('service_type', serviceType)
       .order('created_at', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle(); // Use maybeSingle instead of single to handle no results
     
     // Generate new ticket number
     const prefix = serviceType.substring(0, 1).toUpperCase();
-    const nextNumber = lastTicket ? parseInt(lastTicket.ticket_number.substring(1)) + 1 : 1;
+    const nextNumber = lastTicket && lastTicket.ticket_number ? parseInt(lastTicket.ticket_number.substring(1)) + 1 : 1;
     const ticketNumber = `${prefix}${nextNumber.toString().padStart(3, '0')}`;
     
     // Create the new ticket
@@ -210,10 +210,10 @@ export const redirectTicket = async (ticketId: string, newServiceType: ServiceTy
       .eq('service_type', newServiceType)
       .order('created_at', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle(); // Use maybeSingle to handle no results
     
     const prefix = newServiceType.substring(0, 1).toUpperCase();
-    const nextNumber = lastTicket ? parseInt(lastTicket.ticket_number.substring(1)) + 1 : 1;
+    const nextNumber = lastTicket && lastTicket.ticket_number ? parseInt(lastTicket.ticket_number.substring(1)) + 1 : 1;
     const newTicketNumber = `${prefix}${nextNumber.toString().padStart(3, '0')}`;
     
     // Create new ticket

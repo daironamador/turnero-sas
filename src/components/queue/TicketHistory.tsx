@@ -8,7 +8,7 @@ import { Ticket, Room, Service } from '@/lib/types';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from 'sonner';
-import { initializeFirebase } from '@/lib/firebase';
+
 
 interface TicketHistoryProps {
   counterNumber: string;
@@ -30,50 +30,44 @@ const TicketHistory: React.FC<TicketHistoryProps> = ({
     setIsLoading(true);
     
     try {
-      const app = await initializeFirebase();
-      
-      if (!app) {
-        throw new Error('Firebase not configured');
-      }
-      
-      const { getFirestore, collection, query, where, orderBy, limit, getDocs } = await import('firebase/firestore');
-      const db = getFirestore(app);
+      const { supabase } = await import('@/lib/supabase');
       
       // Get today's date at midnight
       const today = new Date();
       today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
       
       // Query tickets completed at this counter today
-      const ticketsRef = collection(db, 'tickets');
-      const ticketsQuery = query(
-        ticketsRef,
-        where('counter_number', '==', counterNumber),
-        where('created_at', '>=', today.toISOString()),
-        where('status', 'in', ['completed', 'redirected', 'cancelled']),
-        orderBy('created_at', 'desc'),
-        limit(20)
-      );
+      const { data, error } = await supabase
+        .from('tickets')
+        .select('*')
+        .eq('counter_number', counterNumber)
+        .gte('created_at', today.toISOString())
+        .lt('created_at', tomorrow.toISOString())
+        .in('status', ['completed', 'redirected', 'cancelled'])
+        .order('created_at', { ascending: false })
+        .limit(20);
       
-      const snapshot = await getDocs(ticketsQuery);
+      if (error) {
+        throw error;
+      }
       
-      const formattedTickets = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          ticketNumber: data.ticket_number,
-          serviceType: data.service_type,
-          status: data.status,
-          isVip: data.is_vip,
-          createdAt: new Date(data.created_at),
-          calledAt: data.called_at ? new Date(data.called_at) : undefined,
-          completedAt: data.completed_at ? new Date(data.completed_at) : undefined,
-          counterNumber: data.counter_number,
-          patientName: data.patient_name,
-          redirectedTo: data.redirected_to,
-          redirectedFrom: data.redirected_from,
-          previousTicketNumber: data.previous_ticket_number,
-        };
-      });
+      const formattedTickets = data.map(row => ({
+        id: row.id,
+        ticketNumber: row.ticket_number,
+        serviceType: row.service_type,
+        status: row.status,
+        isVip: row.is_vip,
+        createdAt: new Date(row.created_at),
+        calledAt: row.called_at ? new Date(row.called_at) : undefined,
+        completedAt: row.completed_at ? new Date(row.completed_at) : undefined,
+        counterNumber: row.counter_number,
+        patientName: row.patient_name,
+        redirectedTo: row.redirected_to,
+        redirectedFrom: row.redirected_from,
+        previousTicketNumber: row.previous_ticket_number,
+      }));
       
       setTickets(formattedTickets);
     } catch (error) {
