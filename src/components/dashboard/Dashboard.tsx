@@ -26,6 +26,21 @@ const Dashboard: React.FC = () => {
   const isStatsLoading = statsQuery.isLoading;
   const isQueueStatsLoading = queueStatsQuery.isLoading;
   
+  // Debug information
+  React.useEffect(() => {
+    console.log('Dashboard render - Stats:', {
+      statsLoading: statsQuery.isLoading,
+      statsError: statsQuery.error,
+      statsData: statsQuery.data,
+      countersLoading: countersQuery.isLoading,
+      countersError: countersQuery.error,
+      countersData: countersQuery.data,
+      queueStatsLoading: queueStatsQuery.isLoading,
+      queueStatsError: queueStatsQuery.error,
+      queueStatsData: queueStatsQuery.data,
+    });
+  }, [statsQuery, countersQuery, queueStatsQuery]);
+  
   return (
     <div className="space-y-8 animate-slide-down">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
