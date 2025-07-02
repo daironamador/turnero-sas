@@ -16,7 +16,7 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Use Supabase auth hook
+  // Use only Supabase auth hook
   const auth = useSupabaseAuth();
 
   const value = {

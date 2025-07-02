@@ -1,103 +1,57 @@
 
 /**
- * Utility functions for voice synthesis
+ * Utility functions for voice synthesis and ticket announcements
  */
 
-// Format the ticket number for better pronunciation
 export const formatTicketNumber = (ticketNumber: string): string => {
-  // Extract service code prefix (like CG, RX) and the numeric part
-  const serviceCodeMatch = ticketNumber.match(/^([A-Z]+)(\d+)$/);
+  // Remove any non-alphanumeric characters and format for better pronunciation
+  const cleaned = ticketNumber.replace(/[^a-zA-Z0-9]/g, '');
   
-  if (serviceCodeMatch) {
-    const serviceCode = serviceCodeMatch[1]; // e.g., "CG"
-    const numericPart = serviceCodeMatch[2]; // e.g., "001"
-    
-    // Convert numeric part to integer to remove leading zeros
-    const numberValue = parseInt(numericPart, 10);
-    
-    // Spell out each letter individually in the service code
-    // This creates pronunciations like "C G" for "CG"
-    const spellOutServiceCode = serviceCode.split('').join(' ');
-    
-    // Handle specific cases like 100, 200, etc.
-    if (numberValue % 100 === 0 && numberValue <= 900) {
-      const hundreds = numberValue / 100;
-      return `${spellOutServiceCode} ${hundreds === 1 ? "cien" : `${hundreds}cientos`}`;
-    }
-    
-    // Return the service code spelled out + formatted number
-    return `${spellOutServiceCode} ${numberValue.toString()}`;
+  // If it's just numbers, add spaces between digits for better pronunciation
+  if (/^\d+$/.test(cleaned)) {
+    return cleaned.split('').join(' ');
   }
   
-  // Fallback for tickets without a service code prefix
-  const numericOnly = ticketNumber.replace(/\D/g, '');
-  const numberValue = parseInt(numericOnly, 10);
-  
-  if (numberValue % 100 === 0 && numberValue <= 900) {
-    const hundreds = numberValue / 100;
-    return hundreds === 1 ? "cien" : `${hundreds}cientos`;
-  }
-  
-  return numberValue.toString();
+  // If it has letters and numbers, separate them
+  return cleaned.replace(/([a-zA-Z])(\d)/g, '$1 $2').replace(/(\d)([a-zA-Z])/g, '$1 $2');
 };
 
-// Find the best Spanish voice from available voices
-export const findBestSpanishVoice = (voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | undefined => {
-  console.log(`Finding best Spanish voice from ${voices.length} available voices`);
+export const findBestSpanishVoice = (voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null => {
+  if (!voices || voices.length === 0) return null;
   
-  if (voices.length === 0) {
-    // If no voices are available, return undefined
-    console.warn("No voices available for selection");
-    return undefined;
-  }
+  // Priority order for Spanish voices
+  const priorities = [
+    /es-ES.*female/i,    // Spanish (Spain) female
+    /es-ES/i,            // Spanish (Spain) any
+    /es-MX.*female/i,    // Spanish (Mexico) female  
+    /es-MX/i,            // Spanish (Mexico) any
+    /es-AR/i,            // Spanish (Argentina)
+    /es-.*female/i,      // Any Spanish female
+    /es/i,               // Any Spanish
+  ];
   
-  // Log all available voices for debugging
-  voices.forEach(voice => {
-    console.log(`Voice: ${voice.name}, Language: ${voice.lang}, Default: ${voice.default}`);
-  });
-  
-  // Try to find a Spanish Latin American voice first
-  const latinAmericanVoices = voices.filter(voice => 
-    (voice.lang.includes('es-MX') || 
-      voice.lang.includes('es-419') || 
-      voice.lang.includes('es-US') || 
-      voice.lang.includes('es-CO') || 
-      voice.lang.includes('es-AR'))
-  );
-  
-  // If we find Latin American voices, prioritize female voices
-  if (latinAmericanVoices.length > 0) {
-    console.log(`Found ${latinAmericanVoices.length} Latin American Spanish voices`);
-    const femaleVoice = latinAmericanVoices.find(v => 
-      v.name.includes('Female') || 
-      v.name.includes('female') || 
-      v.name.includes('Paulina') || 
-      v.name.includes('Rosa')
+  for (const pattern of priorities) {
+    const match = voices.find(voice => 
+      pattern.test(voice.name) || pattern.test(voice.lang)
     );
-    return femaleVoice || latinAmericanVoices[0];
+    if (match) return match;
   }
   
-  // Fallback to any Spanish voice, but try to avoid es-ES (Spain) if possible
-  const spanishVoices = voices.filter(voice => 
-    voice.lang.includes('es') && !voice.lang.includes('es-ES')
-  );
+  // Fallback to first available voice
+  return voices[0] || null;
+};
+
+export const createAnnouncementText = (
+  ticketNumber: string,
+  counterName: string,
+  redirectedFrom?: string,
+  originalRoomName?: string
+): string => {
+  const formattedNumber = formatTicketNumber(ticketNumber);
   
-  // If no non-Spain Spanish voices found, use any Spanish voice
-  const availableSpanishVoices = spanishVoices.length > 0 ? 
-    spanishVoices : 
-    voices.filter(voice => voice.lang.includes('es'));
-  
-  if (availableSpanishVoices.length > 0) {
-    console.log(`Found ${availableSpanishVoices.length} Spanish voices`);
-    const femaleVoice = availableSpanishVoices.find(v => 
-      v.name.includes('Female') || 
-      v.name.includes('female') || 
-      v.name.includes('Monica')
-    );
-    return femaleVoice || availableSpanishVoices[0];
+  if (redirectedFrom && originalRoomName) {
+    return `Turno ${formattedNumber}, referido de ${originalRoomName}, pasar a ${counterName}`;
   }
   
-  // Last fallback - use any available voice, preferably default
-  console.log("No Spanish voices found, using any available voice");
-  return voices.find(v => v.default) || voices[0];
+  return `Turno ${formattedNumber}, pasar a ${counterName}`;
 };
