@@ -4,11 +4,12 @@ import { format } from 'date-fns';
 import { ArrowRightLeft, Check, Star, Clock } from 'lucide-react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Ticket, ServiceTypeLabels } from '@/lib/types';
+import { Ticket, ServiceTypeLabels, Service, Room } from '@/lib/types';
+
 
 interface LastCalledSectionProps {
   tickets: Ticket[] | undefined;
-  rooms: any[] | undefined;
+  rooms: Room[] | undefined;
   isLoading: boolean;
 }
 

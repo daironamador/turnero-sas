@@ -75,12 +75,17 @@ const TicketManager: React.FC<TicketManagerProps> = ({
       ticketId: nextTicket.id, 
       counterNumber 
     }, {
-      onSuccess: () => {
+      onSuccess: async () => {
         // Anunciar el ticket después de llamarlo exitosamente
         if (counterName) {
-          const announced = announceTicket(nextTicket, counterName, rooms);
-          if (!announced) {
-            toast.warning("Es posible que el anuncio de voz no funcione. Intente llamar otra vez después.");
+          try {
+            const announced = await announceTicket(nextTicket, counterName, rooms);
+            if (!announced) {
+              toast.warning("Es posible que el anuncio de voz no funcione. Intente llamar otra vez después.");
+            }
+          } catch (error) {
+            console.error('Error announcing ticket:', error);
+            toast.warning("Error al reproducir anuncio de voz.");
           }
         }
       }
@@ -113,7 +118,7 @@ const TicketManager: React.FC<TicketManagerProps> = ({
     setIsRedirectDialogOpen(false);
   };
 
-  const handleCallAgain = () => {
+  const handleCallAgain = async () => {
     if (!currentTicket || !counterName) return;
     
     // Intentar reproducir un sonido corto para activar audio en móviles
@@ -129,9 +134,14 @@ const TicketManager: React.FC<TicketManagerProps> = ({
       console.log("No se pudo crear el contexto de audio:", e);
     }
     
-    const announced = announceTicket(currentTicket, counterName, rooms);
-    if (!announced) {
-      toast.warning("Es posible que el anuncio de voz no funcione en este dispositivo.");
+    try {
+      const announced = await announceTicket(currentTicket, counterName, rooms);
+      if (!announced) {
+        toast.warning("Es posible que el anuncio de voz no funcione en este dispositivo.");
+      }
+    } catch (error) {
+      console.error('Error in handleCallAgain:', error);
+      toast.error("Error al reproducir anuncio de voz.");
     }
   };
 
@@ -147,13 +157,18 @@ const TicketManager: React.FC<TicketManagerProps> = ({
     recallTicketMutation.mutate({ 
       ticket: recallTicket
     }, {
-      onSuccess: () => {
+      onSuccess: async () => {
         // Para anuncio, asegurarse de usar el formato correcto para el anuncio
-        announceTicket({
-          ...ticket,
-          counterNumber: counterNumber, // Mantener como string para el anuncio
-          status: "serving"
-        }, counterName, rooms);
+        try {
+          await announceTicket({
+            ...ticket,
+            counterNumber: counterNumber, // Mantener como string para el anuncio
+            status: "serving"
+          }, counterName, rooms);
+        } catch (error) {
+          console.error('Error announcing recalled ticket:', error);
+          toast.warning("Ticket recuperado pero el anuncio falló.");
+        }
       }
     });
   };

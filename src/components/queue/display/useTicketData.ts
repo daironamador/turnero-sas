@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Ticket, ServiceType } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
 
-export function useTicketData(refreshInterval: number = 5000) {
+export function useTicketData(refreshInterval: number = 1000) {
   const [newlyCalledTicket, setNewlyCalledTicket] = useState<Ticket | null>(null);
   const [lastAnnounced, setLastAnnounced] = useState<string | null>(null);
   
@@ -21,7 +21,7 @@ export function useTicketData(refreshInterval: number = 5000) {
         
         if (error) {
           console.error("Error fetching serving tickets:", error);
-          return [];
+          throw new Error(`Database error: ${error.message}`);
         }
         
         return data.map(row => ({
@@ -41,10 +41,18 @@ export function useTicketData(refreshInterval: number = 5000) {
         }));
       } catch (error) {
         console.error("Error fetching serving tickets:", error);
-        return [];
+        throw error;
       }
     },
     refetchInterval: refreshInterval,
+    refetchIntervalInBackground: true,
+    staleTime: 0,
+    gcTime: 30000,
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(500 * 2 ** attemptIndex, 5000),
+    onError: (error) => {
+      console.error("Query error for serving tickets:", error);
+    }
   });
   
   // Fetch waiting tickets
@@ -61,7 +69,7 @@ export function useTicketData(refreshInterval: number = 5000) {
         
         if (error) {
           console.error("Error fetching waiting tickets:", error);
-          return [];
+          throw new Error(`Database error: ${error.message}`);
         }
         
         return data.map(row => ({
@@ -81,10 +89,18 @@ export function useTicketData(refreshInterval: number = 5000) {
         }));
       } catch (error) {
         console.error("Error fetching waiting tickets:", error);
-        return [];
+        throw error;
       }
     },
     refetchInterval: refreshInterval,
+    refetchIntervalInBackground: true,
+    staleTime: 0,
+    gcTime: 30000,
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(500 * 2 ** attemptIndex, 5000),
+    onError: (error) => {
+      console.error("Query error for waiting tickets:", error);
+    }
   });
   
   // Fetch room data

@@ -101,7 +101,7 @@ const NotificationCarousel: React.FC = () => {
           </div>
         );
       
-      case 'youtube':
+      case 'youtube': {
         const videoId = currentNotification.youtubeUrl?.includes('youtube.com/watch?v=')
           ? currentNotification.youtubeUrl.split('v=')[1]?.split('&')[0]
           : currentNotification.youtubeUrl?.includes('youtu.be/')
@@ -126,6 +126,7 @@ const NotificationCarousel: React.FC = () => {
             )}
           </div>
         );
+      }
       
       default:
         return null;

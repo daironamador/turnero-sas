@@ -173,17 +173,21 @@ export function useSpeechInit() {
     
     // Ensure speech synthesis is not paused when page visibility changes
     const handleVisibilityChange = () => {
-      if (window.speechSynthesis) {
-        if (document.hidden) {
-          console.log("Speech synthesis paused due to tab visibility change");
-          if (window.speechSynthesis.speaking) {
-            window.speechSynthesis.pause();
-          }
-        } else {
-          console.log("Speech synthesis resumed due to tab visibility change");
+      if (!window.speechSynthesis) return;
+      
+      if (document.hidden) {
+        console.log("Tab became hidden - preserving speech state");
+        // Don't pause automatically, let ongoing announcements complete
+      } else {
+        console.log("Tab became visible - ensuring speech synthesis is ready");
+        
+        // Only resume if it was actually paused
+        if (window.speechSynthesis.paused) {
           window.speechSynthesis.resume();
-          
-          // Force reload voices when returning to tab
+        }
+        
+        // Force reload voices when returning to tab, but avoid interference
+        if (!window.speechSynthesis.speaking) {
           setTimeout(forceLoadVoices, 300);
         }
       }

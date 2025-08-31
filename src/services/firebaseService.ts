@@ -74,7 +74,7 @@ export const initializeFirestoreData = async () => {
     const db = getFirestore(app);
     
     // Check if collections exist and have data
-    const checkAndInitialize = async (collectionName: string, initialData: any[]) => {
+    const checkAndInitialize = async <T extends { id: string }>(collectionName: string, initialData: T[]) => {
       const collectionRef = collection(db, collectionName);
       const snapshot = await getDocs(collectionRef);
       

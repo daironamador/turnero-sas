@@ -1,19 +1,24 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import DisplayHeader from './display/DisplayHeader';
 import DisplayFooter from './display/DisplayFooter';
 import TicketNotification from './display/TicketNotification';
 import ServingTicketsSection from './display/ServingTicketsSection';
 import LastCalledSection from './display/LastCalledSection';
 import NotificationCarousel from './display/NotificationCarousel';
+import ErrorDisplay from './display/ErrorDisplay';
 import { useTicketData } from './display/useTicketData';
 import { useTicketUpdates } from './display/useTicketUpdates';
+import { toast } from 'sonner';
 
 interface DisplayScreenProps {
   refreshInterval?: number;
 }
 
-const DisplayScreen: React.FC<DisplayScreenProps> = ({ refreshInterval = 5000 }) => {
+const DisplayScreen: React.FC<DisplayScreenProps> = ({ refreshInterval = 1000 }) => {
+  const [hasAudioError, setHasAudioError] = useState(false);
+  const audioInitialized = useRef(false);
+
   const {
     servingTicketsQuery,
     waitingTicketsQuery,
@@ -34,9 +39,78 @@ const DisplayScreen: React.FC<DisplayScreenProps> = ({ refreshInterval = 5000 })
     lastAnnounced,
     setLastAnnounced
   });
+
+  // Check for database errors
+  const hasDatabaseError = servingTicketsQuery.isError || waitingTicketsQuery.isError || roomsQuery.isError;
+
+  // Initialize audio function
+  const initializeAudio = async () => {
+    if (!window.speechSynthesis) {
+      setHasAudioError(true);
+      return;
+    }
+
+    try {
+      const testUtterance = new SpeechSynthesisUtterance(' ');
+      testUtterance.volume = 0.01;
+      
+      return new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Timeout')), 3000);
+        
+        testUtterance.onend = () => {
+          clearTimeout(timeout);
+          audioInitialized.current = true;
+          setHasAudioError(false);
+          toast.success('Audio activado correctamente');
+          resolve();
+        };
+        
+        testUtterance.onerror = (error) => {
+          clearTimeout(timeout);
+          setHasAudioError(true);
+          reject(error);
+        };
+        
+        window.speechSynthesis.speak(testUtterance);
+      });
+    } catch (error) {
+      setHasAudioError(true);
+      toast.error('Error al inicializar audio');
+    }
+  };
+
+  // Handle retry for database connections
+  const handleRetry = () => {
+    servingTicketsQuery.refetch();
+    waitingTicketsQuery.refetch();
+    roomsQuery.refetch();
+    toast.info('Reintentando conexión...');
+  };
+
+  useEffect(() => {
+    // Check audio status periodically
+    const checkAudio = () => {
+      if (!audioInitialized.current && window.speechSynthesis) {
+        setHasAudioError(true);
+      }
+    };
+
+    checkAudio();
+    const interval = setInterval(checkAudio, 10000);
+
+    return () => clearInterval(interval);
+  }, []);
   
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
+      {/* Error Display */}
+      <ErrorDisplay
+        hasAudioError={hasAudioError}
+        hasDatabaseError={hasDatabaseError}
+        onRetry={handleRetry}
+        onInitializeAudio={initializeAudio}
+      />
+
       {/* Header */}
       <DisplayHeader />
       

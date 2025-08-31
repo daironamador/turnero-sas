@@ -67,20 +67,22 @@ export function useSupabaseAuth() {
         toast.success('Inicio de sesión exitoso');
         return data.user;
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error signing in:', err);
       
       // Translate error messages to Spanish
       let errorMessage = 'Error al iniciar sesión';
       
-      if (err.message.includes('Invalid login credentials')) {
-        errorMessage = 'Credenciales inválidas';
-      } else if (err.message.includes('Email not confirmed')) {
-        errorMessage = 'Email no confirmado';
-      } else if (err.message.includes('User not found')) {
-        errorMessage = 'Usuario no encontrado';
-      } else if (err.message.includes('rate limit')) {
-        errorMessage = 'Demasiados intentos fallidos. Intente más tarde';
+      if (err instanceof Error) {
+        if (err.message.includes('Invalid login credentials')) {
+          errorMessage = 'Credenciales inválidas';
+        } else if (err.message.includes('Email not confirmed')) {
+          errorMessage = 'Email no confirmado';
+        } else if (err.message.includes('User not found')) {
+          errorMessage = 'Usuario no encontrado';
+        } else if (err.message.includes('rate limit')) {
+          errorMessage = 'Demasiados intentos fallidos. Intente más tarde';
+        }
       }
       
       toast.error(errorMessage);
@@ -97,7 +99,7 @@ export function useSupabaseAuth() {
       }
       
       toast.success('Sesión cerrada correctamente');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error signing out:', err);
       toast.error('Error al cerrar sesión');
       throw err;

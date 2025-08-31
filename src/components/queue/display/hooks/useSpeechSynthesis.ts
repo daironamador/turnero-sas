@@ -37,20 +37,10 @@ export function useSpeechSynthesis() {
         const testUtterance = new SpeechSynthesisUtterance(' ');
         testUtterance.volume = 0.01;
         
-        testUtterance.onend = () => {
-          setIsInitialized(true);
-          resolve();
-        };
-        
-        testUtterance.onerror = (error) => {
-          console.error('Speech synthesis initialization failed:', error);
-          reject(error);
-        };
-        
-        // Set timeout to prevent hanging
+        // Set timeout to prevent hanging - reduced for real-time
         const timeout = setTimeout(() => {
           reject(new Error('Speech synthesis initialization timeout'));
-        }, 3000);
+        }, 2000);
         
         testUtterance.onend = () => {
           clearTimeout(timeout);
@@ -60,6 +50,7 @@ export function useSpeechSynthesis() {
         
         testUtterance.onerror = (error) => {
           clearTimeout(timeout);
+          console.error('Speech synthesis initialization failed:', error);
           reject(error);
         };
         
@@ -129,10 +120,10 @@ export function useSpeechSynthesis() {
       utterance.onend = () => {
         setIsSpeaking(false);
         console.log('Speech ended');
-        // Clear last announcement after a delay to allow re-announcements
+        // Clear last announcement after a delay - reduced for real-time
         setTimeout(() => {
           lastAnnouncementRef.current = null;
-        }, 3000);
+        }, 1000);
       };
       
       utterance.onerror = (error) => {

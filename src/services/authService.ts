@@ -11,7 +11,7 @@ export const signInWithEmailPassword = async (email: string, password: string) =
     if (error) throw error;
     
     return data;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error signing in:', error);
     throw error;
   }
@@ -27,7 +27,7 @@ export const createUserWithEmailPassword = async (email: string, password: strin
     if (error) throw error;
     
     return data;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error creating user:', error);
     throw error;
   }

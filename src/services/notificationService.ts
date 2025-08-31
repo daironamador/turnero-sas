@@ -133,7 +133,7 @@ export const updateNotification = async (id: string, notification: Partial<Omit<
     const { getFirestore, doc, updateDoc } = await import('firebase/firestore');
     const db = getFirestore(app);
     
-    const updateData: Record<string, any> = {};
+    const updateData: Record<string, string | number | boolean> = {};
     
     if (notification.title !== undefined) updateData.title = notification.title;
     if (notification.content !== undefined) updateData.content = notification.content;

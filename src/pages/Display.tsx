@@ -8,45 +8,66 @@ import { supabase } from '@/lib/supabase';
 const Display: React.FC = () => {
   const audioInitialized = useRef(false);
   
-  // Function to initialize speech synthesis
+  // Function to initialize speech synthesis (requires user interaction)
   const initializeAudio = () => {
     if (!window.speechSynthesis) {
       console.error("Speech synthesis is not supported in this browser");
       toast.error("Su navegador no soporta la síntesis de voz.");
-      return;
+      return Promise.reject(new Error('Speech synthesis not supported'));
     }
     
-    try {
-      // Force reset speech synthesis to clear any stuck state
-      window.speechSynthesis.cancel();
-      
-      // Create voices list to force loading
-      const voices = window.speechSynthesis.getVoices();
-      console.log(`Available voices: ${voices.length}`);
-      
-      // Initialize with a silent utterance to grant permissions
-      const testUtterance = new SpeechSynthesisUtterance(".");
-      testUtterance.volume = 0.1; // Very quiet test
-      testUtterance.rate = 1;
-      testUtterance.lang = 'es-419'; // Set language to Spanish
-      
-      // Set event handlers to track initialization
-      testUtterance.onend = () => {
-        console.log("Audio system initialized successfully");
-        audioInitialized.current = true;
-      };
-      
-      testUtterance.onerror = (error) => {
-        console.error("Error initializing audio:", error);
-        toast.error("Error al inicializar el audio. Intente recargar la página.");
-      };
-      
-      // Speak the test utterance
-      window.speechSynthesis.speak(testUtterance);
-    } catch (error) {
-      console.error("Failed to initialize audio:", error);
-      toast.error("Error al inicializar el audio. Intente recargar la página.");
-    }
+    return new Promise<void>((resolve, reject) => {
+      try {
+        // Force reset speech synthesis to clear any stuck state
+        window.speechSynthesis.cancel();
+        
+        // Create voices list to force loading
+        const voices = window.speechSynthesis.getVoices();
+        console.log(`Available voices: ${voices.length}`);
+        
+        // Initialize with a silent utterance to grant permissions
+        const testUtterance = new SpeechSynthesisUtterance(" ");
+        testUtterance.volume = 0.01; // Very quiet test
+        testUtterance.rate = 1;
+        testUtterance.lang = 'es-419'; // Set language to Spanish
+        
+        const timeout = setTimeout(() => {
+          reject(new Error('Audio initialization timeout'));
+        }, 5000);
+        
+        // Set event handlers to track initialization
+        testUtterance.onend = () => {
+          clearTimeout(timeout);
+          console.log("Audio system initialized successfully");
+          audioInitialized.current = true;
+          toast.success("Sistema de audio inicializado correctamente");
+          resolve();
+        };
+        
+        testUtterance.onerror = (error) => {
+          clearTimeout(timeout);
+          console.error("Error initializing audio:", error);
+          toast.error("Error al inicializar audio - Haz clic en el icono de altavoz para reproducir el anuncio manualmente.");
+          reject(error);
+        };
+        
+        // Speak the test utterance
+        window.speechSynthesis.speak(testUtterance);
+        
+        // Fallback check
+        setTimeout(() => {
+          if (!audioInitialized.current) {
+            console.log("Audio initialization may have failed silently");
+            toast.warning("Audio requiere interacción del usuario - Haz clic en cualquier lugar para activar");
+          }
+        }, 2000);
+        
+      } catch (error) {
+        console.error("Failed to initialize audio:", error);
+        toast.error("Error al inicializar audio - Haz clic en el icono de altavoz para reproducir el anuncio manualmente.");
+        reject(error);
+      }
+    });
   };
 
   // Enable anonymous access to display data
@@ -96,23 +117,31 @@ const Display: React.FC = () => {
       if (window.speechSynthesis) {
         console.log("Speech synthesis is supported in this browser");
         
-        // Auto-initialize audio immediately
-        initializeAudio();
-        
-        // Try again after delays to ensure it's properly initialized
-        setTimeout(() => {
+        // Add click handler to initialize audio on user interaction
+        const handleUserInteraction = async () => {
           if (!audioInitialized.current) {
-            console.log("Trying audio initialization again after 2s...");
-            initializeAudio();
+            try {
+              await initializeAudio();
+              document.removeEventListener('click', handleUserInteraction);
+              document.removeEventListener('keydown', handleUserInteraction);
+              document.removeEventListener('touchstart', handleUserInteraction);
+            } catch (error) {
+              console.error('Audio initialization failed on user interaction:', error);
+            }
           }
-        }, 2000);
+        };
         
-        setTimeout(() => {
-          if (!audioInitialized.current) {
-            console.log("Final attempt to initialize audio after 5s...");
-            initializeAudio();
-          }
-        }, 5000);
+        document.addEventListener('click', handleUserInteraction, { once: true });
+        document.addEventListener('keydown', handleUserInteraction, { once: true });
+        document.addEventListener('touchstart', handleUserInteraction, { once: true });
+        
+        // Try auto-initialization but don't expect it to work due to browser policies
+        initializeAudio().catch(() => {
+          console.log("Auto-initialization failed as expected - waiting for user interaction");
+          toast.info("Haz clic en cualquier lugar para activar el audio", {
+            duration: 5000,
+          });
+        });
       } else {
         console.error("Speech synthesis is NOT supported in this browser - voice announcements will not work");
         toast.error("Su navegador no soporta la síntesis de voz - los anuncios de voz no funcionarán");

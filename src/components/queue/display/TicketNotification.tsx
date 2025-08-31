@@ -8,7 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface TicketNotificationProps {
   ticket: Ticket | null;
-  rooms: any[] | undefined;
+  rooms: Room[] | undefined;
 }
 
 const TicketNotification: React.FC<TicketNotificationProps> = ({ ticket, rooms }) => {

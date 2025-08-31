@@ -4,10 +4,12 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { signInWithEmailPassword } from '@/services/authService';
 import { supabase } from '@/lib/supabase';
+import { CompanySettings } from '@/lib/types';
+import { Database } from '@/lib/database.types';
 
 // Create a custom hook for fetching company settings from Supabase
 const useCompanySettings = () => {
-  const [settings, setSettings] = useState<any>(null);
+  const [settings, setSettings] = useState<CompanySettings | null>(null);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -22,7 +24,20 @@ const useCompanySettings = () => {
           return;
         }
         
-        setSettings(data);
+        if (data) {
+          // Convert database row to CompanySettings type
+          const companySettings: CompanySettings = {
+            id: data.id,
+            name: data.name,
+            address: data.address,
+            phone: data.phone,
+            email: data.email,
+            logo: data.logo || undefined,
+            ticketFooter: data.ticket_footer || undefined,
+            displayMessage: data.display_message || undefined
+          };
+          setSettings(companySettings);
+        }
       } catch (error) {
         console.error('Error loading settings:', error);
       }
@@ -90,9 +105,10 @@ export const useLoginState = () => {
       await signInWithEmailPassword(email, password);
       await refreshUser(); // Make sure we refresh the user info
       navigate(from, { replace: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Login error:', error);
-      setError(error.message || 'Error al iniciar sesión');
+      const errorMessage = error instanceof Error ? error.message : 'Error al iniciar sesión';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

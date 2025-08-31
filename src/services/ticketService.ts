@@ -1,8 +1,12 @@
 import { supabase } from '@/lib/supabase';
 import { Ticket, ServiceType } from '@/lib/types';
+import { Database } from '@/lib/database.types';
+
+// Type for Supabase ticket row
+type SupabaseTicketRow = Database['public']['Tables']['tickets']['Row'];
 
 // Helper function to convert Supabase ticket data to our Ticket type
-const convertSupabaseTicket = (data: any): Ticket => {
+const convertSupabaseTicket = (data: SupabaseTicketRow): Ticket => {
   return {
     id: data.id,
     ticketNumber: data.ticket_number,
@@ -365,12 +369,13 @@ export const getReportByPeriod = async (period: string): Promise<Ticket[]> => {
       case 'daily':
         startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         break;
-      case 'weekly':
+      case 'weekly': {
         // Set to Monday of current week
         const day = now.getDay();
         const diff = now.getDate() - day + (day === 0 ? -6 : 1);
         startDate = new Date(now.getFullYear(), now.getMonth(), diff);
         break;
+      }
       case 'monthly':
         startDate = new Date(now.getFullYear(), now.getMonth(), 1);
         break;

@@ -2,11 +2,11 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Star, Bell } from 'lucide-react';
-import { Ticket, ServiceTypeLabels } from '@/lib/types';
+import { Ticket, ServiceTypeLabels, Room } from '@/lib/types';
 
 interface ServingTicketsSectionProps {
   tickets: Ticket[] | undefined;
-  rooms: any[] | undefined;
+  rooms: Room[] | undefined;
   isLoading: boolean;
 }
 

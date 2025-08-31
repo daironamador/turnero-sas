@@ -3,12 +3,12 @@ import { useEffect, useState, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useSpeechSynthesis } from './useSpeechSynthesis';
-import { Ticket } from '@/lib/types';
+import { Ticket, Room } from '@/lib/types';
 
 interface UseTicketUpdatesProps {
-  roomsQuery: any;
-  servingTicketsQuery: any;
-  waitingTicketsQuery: any;
+  roomsQuery: { data?: Room[]; refetch?: () => void };
+  servingTicketsQuery: { data?: Ticket[]; refetch?: () => void };
+  waitingTicketsQuery: { data?: Ticket[]; refetch?: () => void };
   newlyCalledTicket: Ticket | null;
   setNewlyCalledTicket: (ticket: Ticket | null) => void;
   lastAnnounced: string | null;
@@ -49,10 +49,10 @@ export function useTicketUpdates({
     // Add to processed set to prevent immediate duplicates
     processedAnnouncements.current.add(announcementKey);
     
-    // Clean up processed set after some time to prevent memory leaks
+    // Clean up processed set after some time - optimized for real-time
     setTimeout(() => {
       processedAnnouncements.current.delete(announcementKey);
-    }, 10000);
+    }, 5000);
 
     console.log(`Processing announcement for ticket ${ticket.ticketNumber} on display`);
     
@@ -83,10 +83,10 @@ export function useTicketUpdates({
               timestamp: Date.now()
             });
             
-            // Close channel after sending
+            // Close channel after sending - reduced delay for real-time
             setTimeout(() => {
               ackChannel.close();
-            }, 1000);
+            }, 50);
           } catch (error) {
             console.error('Error sending announcement acknowledgment:', error);
           }
@@ -97,11 +97,11 @@ export function useTicketUpdates({
           clearTimeout(announcementTimeouts.current.get(ticket.id));
         }
         
-        // Set a new timeout to allow this ticket to be announced again after 3 seconds
+        // Set a new timeout - reduced for real-time processing
         const timeoutId = setTimeout(() => {
           setProcessingAnnouncement(false);
           console.log(`Ready to process new announcements after ${ticket.ticketNumber}`);
-        }, 3000);
+        }, 1500);
         
         announcementTimeouts.current.set(ticket.id, timeoutId);
       } catch (error) {
@@ -132,7 +132,7 @@ export function useTicketUpdates({
     channel.subscribe();
     
     let ticketChannel: BroadcastChannel | null = null;
-    let processedMessageIds = new Set<string>();
+    const processedMessageIds = new Map<string, number>();
     
     if (typeof BroadcastChannel !== 'undefined') {
       try {
@@ -145,19 +145,25 @@ export function useTicketUpdates({
           console.log('Received broadcast message in useTicketUpdates:', event.data.type);
           
           // Check if this message has a unique ID and if we've seen it before
-          if (event.data.messageId && processedMessageIds.has(event.data.messageId)) {
-            console.log(`Skipping duplicate message with ID: ${event.data.messageId}`);
-            return;
-          }
-          
-          // Add this message ID to the processed set
           if (event.data.messageId) {
-            processedMessageIds.add(event.data.messageId);
+            const now = Date.now();
+            const lastProcessed = processedMessageIds.get(event.data.messageId);
             
-            // Clean up the set after a while to prevent memory leaks
-            setTimeout(() => {
-              processedMessageIds.delete(event.data.messageId);
-            }, 30000); // Keep track for 30 seconds
+            // If processed recently (within 10 seconds), skip - reduced for real-time
+            if (lastProcessed && (now - lastProcessed) < 10000) {
+              console.log(`Skipping duplicate message with ID: ${event.data.messageId}`);
+              return;
+            }
+            
+            // Add this message ID with timestamp
+            processedMessageIds.set(event.data.messageId, now);
+            
+            // Clean up old entries to prevent memory leaks - reduced time for real-time
+            processedMessageIds.forEach((timestamp, id) => {
+              if ((now - timestamp) > 10000) {
+                processedMessageIds.delete(id);
+              }
+            });
           }
           
           if (event.data.type === 'announce-ticket' && !processingAnnouncement) {

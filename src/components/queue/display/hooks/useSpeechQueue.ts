@@ -124,17 +124,40 @@ export function useSpeechQueue({ voices, setIsSpeaking }: UseSpeechQueueProps) {
         window.speechSynthesis.speak(speech);
         
         // Double-check that speech synthesis is active after a short delay
-        setTimeout(() => {
-          if (!window.speechSynthesis.speaking && processingRef.current) {
+        const retryTimeout = setTimeout(() => {
+          if (!window.speechSynthesis.speaking && processingRef.current && utteranceRef.current === speech) {
             console.log("Speech didn't start properly, retrying...");
             
-            // Only retry if this is still the current utterance
-            if (utteranceRef.current === speech) {
+            try {
               window.speechSynthesis.cancel();
               window.speechSynthesis.speak(speech);
+              
+              // If it still doesn't start after another attempt, fail gracefully
+              setTimeout(() => {
+                if (!window.speechSynthesis.speaking && utteranceRef.current === speech) {
+                  console.error("Speech failed to start after retry, skipping...");
+                  processingRef.current = false;
+                  setIsProcessingState(false);
+                  utteranceRef.current = null;
+                  
+                  // Continue with next item in queue
+                  setTimeout(processQueue, 500);
+                }
+              }, 1000);
+            } catch (error) {
+              console.error("Error during speech retry:", error);
+              processingRef.current = false;
+              setIsProcessingState(false);
+              utteranceRef.current = null;
+              setTimeout(processQueue, 500);
             }
           }
         }, 500);
+        
+        // Store timeout reference for cleanup
+        speech.addEventListener('start', () => clearTimeout(retryTimeout));
+        speech.addEventListener('end', () => clearTimeout(retryTimeout));
+        speech.addEventListener('error', () => clearTimeout(retryTimeout));
         
       } catch (error) {
         console.error("Error speaking:", error);

@@ -26,8 +26,9 @@ export function useTicketMutations(counterNumber: string, onTicketChange: () => 
       toast.success(`Se ha llamado al ticket en la sala seleccionada`);
       onTicketChange();
     },
-    onError: (error: any) => {
-      toast.error(error.message || "No se pudo llamar al ticket");
+    onError: (error: unknown) => {
+      const errorMessage = error instanceof Error ? error.message : "No se pudo llamar al ticket";
+      toast.error(errorMessage);
     },
   });
 
@@ -38,8 +39,9 @@ export function useTicketMutations(counterNumber: string, onTicketChange: () => 
       toast.success(`Se ha completado el ticket`);
       onTicketChange();
     },
-    onError: (error: any) => {
-      toast.error(error.message || "No se pudo completar el ticket");
+    onError: (error: unknown) => {
+      const errorMessage = error instanceof Error ? error.message : "No se pudo completar el ticket";
+      toast.error(errorMessage);
     },
   });
 
@@ -50,8 +52,9 @@ export function useTicketMutations(counterNumber: string, onTicketChange: () => 
       toast.success(`Se ha cancelado el ticket`);
       onTicketChange();
     },
-    onError: (error: any) => {
-      toast.error(error.message || "No se pudo cancelar el ticket");
+    onError: (error: unknown) => {
+      const errorMessage = error instanceof Error ? error.message : "No se pudo cancelar el ticket";
+      toast.error(errorMessage);
     },
   });
 
@@ -63,8 +66,9 @@ export function useTicketMutations(counterNumber: string, onTicketChange: () => 
       toast.success(`Se ha redirigido el ticket al servicio ${variables.serviceType}`);
       onTicketChange();
     },
-    onError: (error: any) => {
-      toast.error(error.message || "No se pudo redirigir el ticket");
+    onError: (error: unknown) => {
+      const errorMessage = error instanceof Error ? error.message : "No se pudo redirigir el ticket";
+      toast.error(errorMessage);
     },
   });
 
@@ -76,8 +80,9 @@ export function useTicketMutations(counterNumber: string, onTicketChange: () => 
       toast.success(`Se ha vuelto a llamar al ticket ${variables.ticket.ticketNumber}`);
       onTicketChange();
     },
-    onError: (error: any) => {
-      toast.error(error.message || "No se pudo rellamar al ticket");
+    onError: (error: unknown) => {
+      const errorMessage = error instanceof Error ? error.message : "No se pudo rellamar al ticket";
+      toast.error(errorMessage);
     },
   });
 
